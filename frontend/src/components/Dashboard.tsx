@@ -33,7 +33,7 @@ import {
   Tooltip,
 } from 'recharts';
 
-import { loadDatabase, Conversation, AnalyticsData, FunniestUserData } from '../utils/database';
+import { loadDatabase, Conversation, AnalyticsData, EmotionUserData } from '../utils/database';
 
 // -----------------------------------------------------------------------------
 // Types
@@ -72,6 +72,29 @@ const Dashboard: React.FC<DashboardProps> = ({ analyticsData, loading, error, se
   // ---------------------------------------------------------------------------
   // Render helpers
   // ---------------------------------------------------------------------------
+  function renderConversationSummary() {
+    if (selectedConversationIds.length !== 1) {
+      return null;
+    }
+    const conversationId = selectedConversationIds[0];
+    const conversation = analyticsData.all_conversations.find((c: Conversation) => c.id === conversationId);
+
+    if (!conversation || !conversation.summary) {
+      return null;
+    }
+
+    return (
+      <Paper sx={{ p: 2, mt: 2, border: '1px solid', borderColor: 'divider' }}>
+        <Typography variant="h6" gutterBottom>
+          Conversation Summary
+        </Typography>
+        <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
+          {conversation.summary}
+        </Typography>
+      </Paper>
+    );
+  }
+
   function renderKpiCard(title: string, value: string | number) {
     return (
       <Grid item xs={12} sm={4}>
@@ -280,34 +303,39 @@ const Dashboard: React.FC<DashboardProps> = ({ analyticsData, loading, error, se
     );
   }
 
-  function renderFunniestUsers() {
-    if (!analyticsData?.funniestUsers || analyticsData.funniestUsers.length === 0) {
+  function EmotionRankings({ title, data, scoreLabel, totalReactsLabel }: {
+    title: string;
+    data: EmotionUserData[];
+    scoreLabel: string;
+    totalReactsLabel: string;
+  }) {
+    if (!data || data.length === 0) {
       return null;
     }
 
     return (
       <Box sx={{ mt: 4 }}>
-        <Typography variant="h5" gutterBottom>😂 Who is the Funniest? 😂</Typography>
+        <Typography variant="h5" gutterBottom>{title}</Typography>
         <Paper sx={{ p: 2 }}>
           <TableContainer>
             <Table stickyHeader size="small">
               <TableHead>
                 <TableRow>
                   <TableCell>User</TableCell>
-                  <TableCell align="right">Total Laugh Reacts</TableCell>
-                  <TableCell align="right">Laugh Rate</TableCell>
-                  <TableCell align="right">Humor Score</TableCell>
+                  <TableCell align="right">{totalReactsLabel}</TableCell>
+                  <TableCell align="right">Rate</TableCell>
+                  <TableCell align="right">{scoreLabel}</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {analyticsData.funniestUsers.map((user: FunniestUserData) => (
+                {data.map((user: EmotionUserData) => (
                   <TableRow key={user.name}>
                     <TableCell component="th" scope="row">
                       {user.name}
                     </TableCell>
-                    <TableCell align="right">{user.totalLaughReacts}</TableCell>
-                    <TableCell align="right">{user.totalLaughRate.toFixed(3)}</TableCell>
-                    <TableCell align="right">{user.humorScore.toFixed(3)}</TableCell>
+                    <TableCell align="right">{user.totalReacts}</TableCell>
+                    <TableCell align="right">{user.rate.toFixed(3)}</TableCell>
+                    <TableCell align="right">{user.score.toFixed(3)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -351,30 +379,33 @@ const Dashboard: React.FC<DashboardProps> = ({ analyticsData, loading, error, se
       </Typography>
 
       {analyticsData?.all_conversations && (
-        <FormControl fullWidth sx={{ mb: 4 }}>
-          <InputLabel id="conversation-filter-label">Filter by Conversation</InputLabel>
-          <Select
-            labelId="conversation-filter-label"
-            multiple
-            value={selectedConversationIds}
-            onChange={handleConversationChange}
-            renderValue={(selected) => (
-              <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                {(selected as string[]).map((value) => {
-                  const conversationName = analyticsData.all_conversations.find((c: any) => c.id === value)?.name || value;
-                  return <Chip key={value} label={conversationName} />;
-                })}
-              </Box>
-            )}
-          >
-            {analyticsData.all_conversations.map((convo: any) => (
-              <MenuItem key={convo.id} value={convo.id}>
-                <Checkbox checked={selectedConversationIds.indexOf(convo.id) > -1} />
-                <ListItemText primary={convo.name} />
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+        <Box sx={{ mb: 4 }}>
+          <FormControl fullWidth>
+            <InputLabel id="conversation-filter-label">Filter by Conversation</InputLabel>
+            <Select
+              labelId="conversation-filter-label"
+              multiple
+              value={selectedConversationIds}
+              onChange={handleConversationChange}
+              renderValue={(selected) => (
+                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                  {(selected as string[]).map((value) => {
+                    const conversation = analyticsData.all_conversations.find((c: Conversation) => c.id === value);
+                    return <Chip key={value} label={conversation?.name || value} />;
+                  })}
+                </Box>
+              )}
+            >
+              {analyticsData.all_conversations.map((convo: Conversation) => (
+                <MenuItem key={convo.id} value={convo.id}>
+                  <Checkbox checked={selectedConversationIds.indexOf(convo.id) > -1} />
+                  <ListItemText primary={convo.name} />
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+          {renderConversationSummary()}
+        </Box>
       )}
 
       {renderKpiSummary()}
@@ -395,7 +426,28 @@ const Dashboard: React.FC<DashboardProps> = ({ analyticsData, loading, error, se
           {renderAwards()}
         </Grid>
         <Grid item xs={12}>
-          {renderFunniestUsers()}
+          <EmotionRankings
+            title="😂 Who is the Funniest? 😂"
+            data={analyticsData.funniestUsers}
+            scoreLabel="Humor Score"
+            totalReactsLabel="Total Laugh Reacts"
+          />
+        </Grid>
+        <Grid item xs={12}>
+          <EmotionRankings
+            title="😮 Who is the Most Shocking? 😮"
+            data={analyticsData.mostShockingUsers}
+            scoreLabel="Shock Score"
+            totalReactsLabel="Total Shock Reacts"
+          />
+        </Grid>
+        <Grid item xs={12}>
+          <EmotionRankings
+            title="❤️ Who is the Most Loved? ❤️"
+            data={analyticsData.mostLovedUsers}
+            scoreLabel="Love Score"
+            totalReactsLabel="Total Love Reacts"
+          />
         </Grid>
       </Grid>
     </Box>

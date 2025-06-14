@@ -1,7 +1,23 @@
 const webpack = require('webpack');
 const path = require('path');
 
+
 module.exports = {
+  devServer: {
+    static: {
+      directory: path.join(__dirname, '../public'),
+      publicPath: '/',
+    },
+    devMiddleware: {
+      publicPath: '/',
+    },
+    historyApiFallback: {
+      disableDotRule: true,
+    },
+  },
+  output: {
+    publicPath: '/',
+  },
   resolve: {
     fallback: {
       fs: false,
@@ -40,6 +56,7 @@ module.exports = {
       process: 'process/browser',
       Buffer: ['buffer', 'Buffer'],
     }),
+
   ],
   externals: {
     'sql.js': {

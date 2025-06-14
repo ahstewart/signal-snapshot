@@ -1,0 +1,14 @@
+# Dependencies
+/frontend/node_modules
+
+# AI Models
+/frontend/public/models
+
+# Build output
+/frontend/dist
+
+# Log files
+*.log
+
+# Environment variables
+.env*
