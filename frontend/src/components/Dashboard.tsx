@@ -33,7 +33,7 @@ import {
   Tooltip,
 } from 'recharts';
 
-import { loadDatabase, Conversation, AnalyticsData, EmotionUserData } from '../utils/database';
+import { loadDatabase, Conversation, AnalyticsData, EmotionUserData, User } from '../utils/database';
 
 // -----------------------------------------------------------------------------
 // Types
@@ -44,17 +44,29 @@ type EmojiCount = { emoji: string; count: number };
 // Component
 // -----------------------------------------------------------------------------
 interface DashboardProps {
-  analyticsData: any;
+  data: AnalyticsData | null; // Changed from any to AnalyticsData | null
   loading: boolean;
   error: string | null;
   selectedConversationIds: string[];
-  setSelectedConversationIds: React.Dispatch<React.SetStateAction<string[]>>;
+  onConversationSelect: React.Dispatch<React.SetStateAction<string[]>>;
+  users: User[]; // Changed from any[] to User[]
+  selectedUser: string;
+  onUserSelect: (user: string) => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ analyticsData, loading, error, selectedConversationIds, setSelectedConversationIds }) => {
+const Dashboard: React.FC<DashboardProps> = ({ 
+  data, 
+  loading, 
+  error, 
+  selectedConversationIds, 
+  onConversationSelect,
+  users,
+  selectedUser,
+  onUserSelect
+}: DashboardProps) => {
   const handleConversationChange = (event: SelectChangeEvent<string[]>) => {
     const { target: { value } } = event;
-    setSelectedConversationIds(
+    onConversationSelect(
       // On autofill we get a stringified value.
       typeof value === 'string' ? value.split(',') : value,
     );
@@ -67,7 +79,52 @@ const Dashboard: React.FC<DashboardProps> = ({ analyticsData, loading, error, se
     return `${hour}:00`;
   }
 
-  // No local state or handlers needed; all data comes from props
+  // Create a map of user IDs to names
+  const userNameMap = React.useMemo(() => {
+    const map: Record<string, string> = {};
+    users.forEach(user => {
+      map[user.id] = user.name;
+    });
+    return map;
+  }, [users]);
+
+  // Helper function to get user name by ID
+  const getUserName = (id: string): string => {
+    return userNameMap[id] || id;
+  };
+  
+  // Use the data prop as analyticsData for backward compatibility
+  const analyticsData = data;
+  
+  // Helper function to safely access analyticsData properties
+  const getAnalyticsData = <T,>(getter: (data: AnalyticsData) => T, defaultValue: T): T => {
+    return analyticsData ? getter(analyticsData) : defaultValue;
+  };
+
+  // Early return if no data is available
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Alert severity="error">{error}</Alert>
+      </Box>
+    );
+  }
+
+  if (!analyticsData) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Alert severity="info">No data available. Please upload a Signal database to get started.</Alert>
+      </Box>
+    );
+  }
 
   // ---------------------------------------------------------------------------
   // Render helpers
@@ -76,10 +133,16 @@ const Dashboard: React.FC<DashboardProps> = ({ analyticsData, loading, error, se
     if (selectedConversationIds.length !== 1) {
       return null;
     }
+    
+    const allConversations = getAnalyticsData(data => data.all_conversations, []);
+    if (!allConversations) {
+      return null;
+    }
+    
     const conversationId = selectedConversationIds[0];
-    const conversation = analyticsData.all_conversations.find((c: Conversation) => c.id === conversationId);
+    const conversation = allConversations.find((c: Conversation) => c.id === conversationId);
 
-    if (!conversation || !conversation.summary) {
+    if (!conversation?.summary) {
       return null;
     }
 
@@ -170,7 +233,7 @@ const Dashboard: React.FC<DashboardProps> = ({ analyticsData, loading, error, se
                 {analyticsData.top_conversations.map((convo: { name: string; count: number }) => (
                   <TableRow key={convo.name}>
                     <TableCell component="th" scope="row">
-                      {analyticsData.userNamesById?.[convo.name] || convo.name}
+                      {getUserName(convo.name)}
                     </TableCell>
                     <TableCell align="right">{convo.count}</TableCell>
                   </TableRow>
@@ -234,7 +297,7 @@ const Dashboard: React.FC<DashboardProps> = ({ analyticsData, loading, error, se
                   </TableHead>
                   <TableBody>
                     {Object.entries(analyticsData.reactions.top_emojis_by_author).map(([authorId, emojis]) => {
-                      const userName = analyticsData.userNamesById?.[authorId] || authorId;
+                      const userName = getUserName(authorId);
                       return (
                         <TableRow key={authorId}>
                           <TableCell component="th" scope="row" sx={{ fontFamily: 'monospace', fontSize: '0.8rem', overflowWrap: 'break-word', maxWidth: '150px' }}>{userName}</TableCell>
@@ -260,7 +323,7 @@ const Dashboard: React.FC<DashboardProps> = ({ analyticsData, loading, error, se
           {award.winner ? (
             <>
               <Typography variant="body1" color="text.secondary" sx={{ fontFamily: 'monospace', fontSize: '0.8rem', overflowWrap: 'break-word', my: 1, maxWidth: '100%' }}>
-                {analyticsData.userNamesById?.[award.winner as string] || award.winner}
+                {award.winner ? getUserName(award.winner) : 'N/A'}
               </Typography>
               <Typography variant="h5" component="div" sx={{ fontWeight: 'bold' }}>
                 {award.count}
@@ -372,13 +435,37 @@ const Dashboard: React.FC<DashboardProps> = ({ analyticsData, loading, error, se
     return <Typography>No data available.</Typography>;
   }
 
+  if (loading) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+        <CircularProgress />
+      </Box>
+    );
+  }
+
+  if (error) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Alert severity="error">{error}</Alert>
+      </Box>
+    );
+  }
+
+  if (!analyticsData) {
+    return (
+      <Box sx={{ p: 3 }}>
+        <Alert severity="info">No data available. Please upload a Signal database to get started.</Alert>
+      </Box>
+    );
+  }
+
   return (
     <Box sx={{ p: 3 }}>
       <Typography variant="h4" gutterBottom>
         Signal Analytics Dashboard
       </Typography>
 
-      {analyticsData?.all_conversations && (
+      {analyticsData.all_conversations && (
         <Box sx={{ mb: 4 }}>
           <FormControl fullWidth>
             <InputLabel id="conversation-filter-label">Filter by Conversation</InputLabel>

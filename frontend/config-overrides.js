@@ -1,9 +1,34 @@
-module.exports = function override(config) {
-  // Add fallback for 'fs' to fix sql.js browser build error
-  if (!config.resolve) config.resolve = {};
-  if (!config.resolve.fallback) config.resolve.fallback = {};
-  config.resolve.fallback.fs = false;
-  config.resolve.fallback.path = false;
-  config.resolve.fallback.crypto = false;
-  return config;
+const CopyWebpackPlugin = require('copy-webpack-plugin');
+
+module.exports = {
+  webpack: function(config, env) {
+    config.resolve.fallback = {
+      fs: false,
+      path: false,
+      crypto: false,
+    };
+
+    config.plugins.push(
+      new CopyWebpackPlugin({
+        patterns: [
+          {
+            from: 'node_modules/sql.js/dist/sql-wasm.wasm',
+            to: '../public/sql-wasm.wasm',
+          },
+        ],
+      })
+    );
+
+    return config;
+  },
+  devServer: function(configFunction) {
+    return function(proxy, allowedHost) {
+      const config = configFunction(proxy, allowedHost);
+      config.headers = {
+        'Cross-Origin-Opener-Policy': 'same-origin',
+        'Cross-Origin-Embedder-Policy': 'require-corp',
+      };
+      return config;
+    };
+  },
 };

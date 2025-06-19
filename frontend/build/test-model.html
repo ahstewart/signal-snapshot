@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Model File Test</title>
+    <script>
+        async function testModelFile() {
+            const modelFiles = [
+                'config.json',
+                'generation_config.json',
+                'pytorch_model.bin',
+                'tokenizer.json',
+                'tokenizer_config.json',
+                'vocab.json'
+            ];
+
+            const baseUrl = '/models/Xenova/distilbart-cnn-6-6/';
+            const results = document.getElementById('results');
+            
+            for (const file of modelFiles) {
+                const url = baseUrl + file;
+                const status = document.createElement('div');
+                status.textContent = `Checking ${file}... `;
+                results.appendChild(status);
+                
+                try {
+                    const response = await fetch(url);
+                    if (response.ok) {
+                        status.textContent += '✅ Loaded successfully';
+                        if (file.endsWith('.json')) {
+                            const json = await response.json();
+                            console.log(`${file} content:`, json);
+                        }
+                    } else {
+                        status.textContent += `❌ Failed with status ${response.status}`;
+                    }
+                } catch (error) {
+                    status.textContent += `❌ Error: ${error.message}`;
+                }
+                results.appendChild(document.createElement('br'));
+            }
+        }
+        
+        window.onload = testModelFile;
+    </script>
+</head>
+<body>
+    <h1>Model File Test</h1>
+    <div id="results"></div>
+</body>
+</html>

@@ -4,37 +4,58 @@
 
 // Import CryptoJS for encryption/decryption
 import CryptoJS from 'crypto-js';
-import { summarize } from './ai';
+// We will dynamically import sql.js inside the function to ensure it's loaded correctly.
+import { summarize, type ChatMessage } from './ai';
+import debug from 'debug';
+
+// Efficiently convert CryptoJS WordArray to Uint8Array (avoids memory issues for large files)
+function wordArrayToUint8Array(wordArray: CryptoJS.lib.WordArray): Uint8Array {
+    const words = wordArray.words;
+    const sigBytes = wordArray.sigBytes;
+    const u8 = new Uint8Array(sigBytes);
+    let i = 0;
+    while (i < sigBytes) {
+        const word = words[(i / 4) | 0];
+        u8[i] = (word >> (24 - (i % 4) * 8)) & 0xff;
+        i++;
+    }
+    return u8;
+}
+
+// We need to define the type for the sql.js instance, as we can't import it directly
+// in a way that satisfies all TypeScript configurations.
+// This interface defines the parts of the sql.js object that we use.
+export interface SqlJsStatic {
+  Database: new (data?: Uint8Array | null) => {
+    exec(sql: string): any[];
+    close(): void;
+  };
+}
 
 // Singleton pattern for SQL.js initialization
-let sqlJsInstance: any = null;
-let sqlJsInitPromise: Promise<any> | null = null;
+let sqlJsInitPromise: Promise<SqlJsStatic> | null = null;
 
-export async function getSqlJs() {
-    if (sqlJsInstance) return sqlJsInstance;
-    if (!sqlJsInitPromise) {
-        sqlJsInitPromise = (async () => {
-            try {
-                const [SQLModule, wasmBinary] = await Promise.all([
-                    import('sql.js'),
-                    fetch('/sql-wasm.wasm').then(res => {
-                        if (!res.ok) {
-                            throw new Error(`Failed to fetch wasm file: ${res.statusText}`);
-                        }
-                        return res.arrayBuffer();
-                    })
-                ]);
-
-                const initSqlJs = SQLModule.default as unknown as (config: any) => Promise<any>;
-                const SQL = await initSqlJs({ wasmBinary });
-                sqlJsInstance = SQL;
-                return SQL;
-            } catch (err) {
-                console.error('Failed to initialize sql.js:', err);
-                throw err;
-            }
-        })();
+export async function getSqlJs(): Promise<SqlJsStatic> {
+    if (sqlJsInitPromise) {
+        return sqlJsInitPromise;
     }
+    sqlJsInitPromise = (async () => {
+        try {
+            // Dynamically import the module to get the initializer function.
+            const sqlJsModule = await import('sql.js');
+            // Support both ESM and CommonJS builds
+            const initSqlJs: any = sqlJsModule.default || sqlJsModule;
+            const SQL = await initSqlJs({
+                locateFile: (file: string) => `${process.env.PUBLIC_URL}/${file}`
+            });
+            return SQL;
+        } catch (err) {
+            console.error('Failed to initialize sql.js:', err);
+            // Reset promise on failure to allow future retries
+            sqlJsInitPromise = null;
+            throw err;
+        }
+    })();
     return sqlJsInitPromise;
 }
 
@@ -99,43 +120,207 @@ export interface AnalyticsData {
     mostLovedUsers: EmotionUserData[];
 }
 
-export async function decryptDatabase(
+// Type for progress callback
+export type ProgressCallback = (progress: number, description: string) => void;
+
+// Helper function to try decrypting with given parameters
+async function tryDecrypt(
     encrypted: ArrayBuffer,
-    password: string
-): Promise<ArrayBuffer> {
+    key: CryptoJS.lib.WordArray,
+    iv: CryptoJS.lib.WordArray,
+    mode: any,
+    padding: any,
+    description: string,
+    onProgress?: ProgressCallback
+): Promise<ArrayBuffer | null> {
     try {
-        // The key from Signal's config is a long hex string. We only need the first 32 bytes (64 hex chars) for the AES key.
-        const keyHex = password.substring(0, 64);
-        const key = CryptoJS.enc.Hex.parse(keyHex);
-
-        // The first 16 bytes of the encrypted file are the IV
-        const iv = CryptoJS.lib.WordArray.create(encrypted.slice(0, 16));
-
-        // The rest of the file is the ciphertext
-        const ciphertext = CryptoJS.lib.WordArray.create(encrypted.slice(16));
-
-        // Decrypt using AES-256-CBC
-        const decrypted = CryptoJS.AES.decrypt(
-            { ciphertext: ciphertext } as any,
-            key,
-            {
-                iv: iv,
-                mode: CryptoJS.mode.CBC,
-                padding: CryptoJS.pad.Pkcs7,
+        console.log(`[Decrypt] Trying decryption with ${description}`);
+        if (onProgress) onProgress(0, `Starting ${description}...`);
+        
+        // Calculate chunk size for progress reporting (process in 1MB chunks)
+        const CHUNK_SIZE = 1024 * 1024;
+        const ciphertext = CryptoJS.lib.WordArray.create(encrypted.slice(iv.sigBytes / 4));
+        
+        if (onProgress) onProgress(10, 'Initializing decryption...');
+        
+        // For large files, we need to process in chunks to show progress
+        let decrypted: CryptoJS.lib.WordArray;
+        
+        if (ciphertext.sigBytes > CHUNK_SIZE * 2) {
+            // Process in chunks for large files
+            if (onProgress) onProgress(20, 'Decrypting in chunks...');
+            
+            const totalChunks = Math.ceil(ciphertext.sigBytes / CHUNK_SIZE);
+            const chunks: CryptoJS.lib.WordArray[] = [];
+            
+            for (let i = 0; i < totalChunks; i++) {
+                const start = i * CHUNK_SIZE;
+                const end = Math.min(start + CHUNK_SIZE, ciphertext.sigBytes);
+                const chunk = CryptoJS.lib.WordArray.create(ciphertext.words.slice(start / 4, end / 4));
+                
+                if (onProgress) {
+                    const progress = 20 + (i / totalChunks) * 70;
+                    onProgress(progress, `Decrypting chunk ${i + 1} of ${totalChunks}...`);
+                }
+                
+                const chunkDecrypted = CryptoJS.AES.decrypt(
+                    { ciphertext: chunk } as any,
+                    key,
+                    { 
+                        iv: i === 0 ? iv : CryptoJS.lib.WordArray.random(16), // Only use IV for first chunk
+                        mode: CryptoJS.mode.CBC,
+                        padding: i === totalChunks - 1 ? padding : CryptoJS.pad.NoPadding
+                    }
+                );
+                
+                chunks.push(chunkDecrypted);
+                
+                // Small delay to allow UI to update
+                await new Promise(resolve => setTimeout(resolve, 0));
             }
-        );
-
-        // Convert the decrypted WordArray back to a Uint8Array
-        const decryptedBytes = decrypted.toString(CryptoJS.enc.Latin1);
-        const decryptedArray = new Uint8Array(decryptedBytes.length);
-        for (let i = 0; i < decryptedBytes.length; i++) {
-            decryptedArray[i] = decryptedBytes.charCodeAt(i);
+            
+            // Combine all chunks
+            decrypted = chunks.reduce((result, chunk) => {
+                result.concat(chunk);
+                return result;
+            }, CryptoJS.lib.WordArray.create());
+            
+        } else {
+            // Process small files in one go
+            if (onProgress) onProgress(20, 'Decrypting...');
+            
+            decrypted = CryptoJS.AES.decrypt(
+                { ciphertext } as any,
+                key,
+                { iv, mode, padding }
+            );
+            
+            if (onProgress) onProgress(90, 'Processing decrypted data...');
         }
 
-        return decryptedArray.buffer;
+        if (!decrypted || decrypted.sigBytes === 0) {
+            console.log(`[Decrypt] Decryption with ${description} failed: empty result`);
+            if (onProgress) onProgress(100, 'Decryption failed: empty result');
+            return null;
+        }
+
+        if (onProgress) onProgress(95, 'Converting data...');
+        const decryptedArray = wordArrayToUint8Array(decrypted);
+        const decryptedBuffer = decryptedArray.slice().buffer as ArrayBuffer;
+
+        // Quick check if this looks like a SQLite database
+        if (decryptedBuffer.byteLength > 16) {
+            const header = new Uint8Array(decryptedBuffer, 0, 16);
+            const sqliteHeader = new TextEncoder().encode('SQLite format 3\0');
+            let isSqlite = true;
+            
+            for (let i = 0; i < sqliteHeader.length; i++) {
+                if (header[i] !== sqliteHeader[i]) {
+                    isSqlite = false;
+                    break;
+                }
+            }
+            
+            if (isSqlite) {
+                console.log(`[Decrypt] Success! Valid SQLite database found with ${description}`);
+                return decryptedBuffer;
+            }
+        }
+        
+        return null;
     } catch (error) {
-        console.error('Error decrypting database:', error);
-        throw new Error('Failed to decrypt database. Check if the key is correct.');
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.log(`[Decrypt] Error with ${description}:`, errorMessage);
+        return null;
+    }
+}
+
+export async function decryptDatabase(
+    encrypted: ArrayBuffer,
+    password: string,
+    onProgress?: ProgressCallback
+): Promise<ArrayBuffer> {
+    console.log(`[Decrypt] Starting decryption for ${encrypted.byteLength} bytes.`);
+    
+    try {
+        // Initialize progress
+        const updateProgress = (progress: number, description: string) => {
+            if (onProgress) onProgress(Math.min(100, Math.max(0, progress)), description);
+        };
+
+        updateProgress(0, 'Starting decryption...');
+        
+        // Clean and validate the key
+        updateProgress(5, 'Validating key...');
+        const cleanKey = password.replace(/\s+/g, '').toLowerCase();
+        if (!/^[0-9a-f]+$/.test(cleanKey)) {
+            throw new Error('Invalid key format. Key must be a hex string.');
+        }
+        
+        // The first 16 bytes are the IV
+        updateProgress(10, 'Extracting IV...');
+        const iv = CryptoJS.lib.WordArray.create(encrypted.slice(0, 16));
+        console.log(`[Decrypt] IV extracted: ${iv.toString(CryptoJS.enc.Hex)}`);
+        
+        // Try different key lengths (32, 16, 24 bytes - AES key sizes)
+        const keyVariants = [
+            { length: 32, desc: '32-byte key (AES-256)', weight: 3 },
+            { length: 24, desc: '24-byte key (AES-192)', weight: 2 },
+            { length: 16, desc: '16-byte key (AES-128)', weight: 1 },
+        ];
+
+        const totalAttempts = keyVariants.reduce((sum, v) => sum + v.weight * 3, 0);
+        let currentAttempt = 0;
+
+        // Try different key variants and decryption parameters
+        for (const variant of keyVariants) {
+            const keyHex = cleanKey.substring(0, variant.length * 2).padEnd(variant.length * 2, '0');
+            const key = CryptoJS.enc.Hex.parse(keyHex);
+            
+            const variantProgress = (currentAttempt / totalAttempts) * 90 + 10; // 10-100%
+            updateProgress(variantProgress, `Trying ${variant.desc}...`);
+            console.log(`[Decrypt] Trying with ${variant.desc}`);
+            
+            // Try different modes and paddings
+            const modePaddingCombinations = [
+                { mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.Pkcs7, desc: 'CBC with PKCS7' },
+                { mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.NoPadding, desc: 'CBC with NoPadding' },
+                { mode: CryptoJS.mode.CTR, padding: CryptoJS.pad.NoPadding, desc: 'CTR with NoPadding' },
+            ];
+            
+            for (const { mode, padding, desc } of modePaddingCombinations) {
+                const attemptProgress = (currentAttempt / totalAttempts) * 90 + 10;
+                updateProgress(attemptProgress, `Trying ${variant.desc}, ${desc}...`);
+                
+                const result = await tryDecrypt(
+                    encrypted,
+                    key,
+                    iv,
+                    mode,
+                    padding,
+                    `${variant.desc}, ${desc}`,
+                    (progress, description) => {
+                        // Scale progress within this attempt's range
+                        const minProgress = (currentAttempt / totalAttempts) * 90 + 10;
+                        const maxProgress = ((currentAttempt + 1) / totalAttempts) * 90 + 10;
+                        const scaledProgress = minProgress + (maxProgress - minProgress) * (progress / 100);
+                        updateProgress(scaledProgress, description);
+                    }
+                );
+                
+                currentAttempt++;
+                if (result) {
+                    updateProgress(100, 'Decryption successful!');
+                    return result;
+                }
+            }
+        }
+        
+        // If we get here, all attempts failed
+        throw new Error('Failed to decrypt database with any known method. The key may be incorrect or the file may be corrupted.');
+    } catch (error) {
+        console.error('[Decrypt] An error occurred during decryption:', error);
+        throw new Error('Failed to decrypt database. Check if the key is correct or see console for details.');
     }
 }
 
@@ -143,47 +328,107 @@ export async function decryptDatabase(
 export async function loadDatabase(
     dbBuffer: ArrayBuffer,
     key?: string,
-    conversationIds?: string[]
+    conversationIds?: string[],
+    onProgress?: ProgressCallback
 ): Promise<AnalyticsData> {
-    // Check for the SQLite header by comparing the first 16 bytes of the file
-    const sqliteHeader = new Uint8Array([
-        0x53, 0x51, 0x4c, 0x69, 0x74, 0x65, 0x20, 0x66, 0x6f, 0x72, 0x6d, 0x61, 0x74,
-        0x20, 0x33, 0x00, // "SQLite format 3\0"
-    ]);
-    const fileHeader = new Uint8Array(dbBuffer.slice(0, 16));
+    try {
+        // Check for the SQLite header by comparing the first 16 bytes of the file
+        const sqliteHeader = new Uint8Array([
+            0x53, 0x51, 0x4c, 0x69, 0x74, 0x65, 0x20, 0x66, 0x6f, 0x72, 0x6d, 0x61, 0x74,
+            0x20, 0x33, 0x00, // "SQLite format 3\0"
+        ]);
+        const fileHeader = new Uint8Array(dbBuffer.slice(0, 16));
 
-    const isDecrypted =
-        fileHeader.length === sqliteHeader.length &&
-        fileHeader.every((byte, i) => byte === sqliteHeader[i]);
+        const isDecrypted =
+            fileHeader.length === sqliteHeader.length &&
+            fileHeader.every((byte, i) => byte === sqliteHeader[i]);
 
-    if (isDecrypted) {
-        // Already decrypted, process directly
-        return processDatabase(dbBuffer, conversationIds);
-    } else if (key) {
-        // Encrypted, so decrypt first
-        const decryptedBuffer = await decryptDatabase(dbBuffer, key);
-        return processDatabase(decryptedBuffer, conversationIds);
-    } else {
-        // Encrypted but no key provided
-        throw new Error('This database is encrypted. Please provide a key.');
+        if (isDecrypted) {
+            // Already decrypted, process directly
+            if (onProgress) onProgress(50, 'Processing database...');
+            const result = await processDatabase(dbBuffer, conversationIds);
+            if (onProgress) onProgress(100, 'Database processed successfully');
+            return result;
+        } else if (key) {
+            // Encrypted, so decrypt first
+            if (onProgress) onProgress(0, 'Starting database decryption...');
+            const decryptedBuffer = await decryptDatabase(dbBuffer, key, 
+                (progress, message) => {
+                    // Scale decryption progress to 0-80% range
+                    const scaledProgress = Math.floor(progress * 0.8);
+                    if (onProgress) onProgress(scaledProgress, message);
+                }
+            );
+            
+            // Now process the decrypted database (remaining 80-100%)
+            if (onProgress) onProgress(85, 'Processing decrypted data...');
+            const result = await processDatabase(decryptedBuffer, conversationIds);
+            if (onProgress) onProgress(100, 'Database processed successfully');
+            return result;
+        } else {
+            // Encrypted but no key provided
+            if (onProgress) onProgress(100, 'Error: Database is encrypted but no key provided');
+            throw new Error('This database is encrypted. Please provide a key.');
+        }
+    } catch (error) {
+        console.error('Error in loadDatabase:', error);
+        if (onProgress) onProgress(100, 'Error processing database');
+        throw error;
     }
 }
 
+// Helper function to process database and generate analytics
 export async function processDatabase(
     dbBuffer: ArrayBuffer,
-    conversationIds?: string[]
+    conversationIds?: string[],
+    onProgress?: ProgressCallback
 ): Promise<AnalyticsData> {
+    debug.log('Starting database processing');
+    debug.log(`Buffer size: ${dbBuffer.byteLength} bytes`);
+    
+    // Update progress if callback provided
+    if (onProgress) onProgress(0, 'Initializing database processing...');
+    
+    // Log first 16 bytes of the buffer for verification
+    const header = new Uint8Array(dbBuffer.slice(0, 16));
+    debug.log('Database header bytes:', Array.from(header).map(b => b.toString(16).padStart(2, '0')).join(' '));
+    
     try {
-        const db = await createDatabaseFromBuffer(dbBuffer);
+        if (onProgress) onProgress(10, 'Creating database from buffer...');
+        debug.log('Attempting to create database from buffer...');
+        
+        const db = await createDatabaseFromBuffer(dbBuffer).catch(error => {
+            const errorMsg = `Error in createDatabaseFromBuffer: ${error instanceof Error ? error.message : String(error)}`;
+            debug(errorMsg);
+            // Additional debug: Try to create a file and read it back to verify the buffer
+            debug.log('First 100 bytes as text:', 
+                new TextDecoder().decode(dbBuffer.slice(0, 100)));
+            if (onProgress) onProgress(100, 'Error creating database');
+            throw new Error(errorMsg);
+        });
+        
+        debug.log('Database created successfully');
+        if (onProgress) onProgress(20, 'Database loaded, processing data...');
+        
         const buildWhereClause = (tableAlias?: string, idColumn: string = 'conversationId') => {
-            if (!conversationIds || conversationIds.length === 0) return '';
+            debug.log(`Building WHERE clause for ${tableAlias || 'default'} with column ${idColumn}`);
+            if (!conversationIds || conversationIds.length === 0) {
+                debug.log('No conversation IDs provided, returning empty WHERE clause');
+                return '';
+            }
             const prefix = tableAlias ? `${tableAlias}.` : '';
             const ids = conversationIds.map(id => `'${id}'`).join(',');
-            return `WHERE ${prefix}${idColumn} IN (${ids})`;
+            const whereClause = `WHERE ${prefix}${idColumn} IN (${ids})`;
+            debug.log(`Generated WHERE clause: ${whereClause}`);
+            return whereClause;
         };
 
+        debug.log('Conversation IDs:', conversationIds || 'None provided (will process all conversations)');
+
+        debug.log('Building WHERE clauses...');
         const messagesWhereClause = buildWhereClause();
         const reactionsWhereClause = buildWhereClause();
+        debug.log('WHERE clauses built');
         const conversationsWhereClause = buildWhereClause(undefined, 'id');
         const messagesJoinWhereClause = buildWhereClause('m');
 
@@ -223,9 +468,9 @@ export async function processDatabase(
                 }
             });
         }
-        console.log('Constructed userNamesById mapping:', analytics.userNamesById);
-
-        // Get all conversations
+        
+        // Process conversations
+        if (onProgress) onProgress(25, 'Loading conversations...');
         const conversationsQuery = `SELECT id, name FROM conversations ${conversationsWhereClause}`;
         const conversationsResults = db.exec(conversationsQuery);
         if (conversationsResults[0]) {
@@ -234,82 +479,21 @@ export async function processDatabase(
                 name: analytics.userNamesById[id] || name || 'Unknown',
             }));
             analytics.all_conversations = conversations;
-
-            // --- FIXED SUMMARIZATION LOGIC ---
-            // Only run the expensive summarization if the user has filtered to exactly one conversation.
-            if (conversationIds && conversationIds.length === 1) {
-                const conversationToSummarize = analytics.all_conversations.find(c => c.id === conversationIds[0]);
-
-                if (conversationToSummarize) {
-                    console.log(`Fetching messages to summarize conversation: ${conversationToSummarize.name}`);
-                    const messagesQuery = `
-                        SELECT 
-                            json_extract(json, '$.sourceName') as author, 
-                            json_extract(json, '$.body') as body 
-                        FROM messages 
-                        WHERE conversationId = '${conversationToSummarize.id}' AND json_extract(json, '$.body') IS NOT NULL 
-                        ORDER BY sent_at ASC
-                    `;
-                    const messageResults = db.exec(messagesQuery);
-
-                    if (messageResults[0] && messageResults[0].values.length > 0) {
-                        const messages = messageResults[0].values.slice(-500); // Take last 500 messages
-                        
-                        const chatMessages: { Author: string, Body: string }[] = messages
-                            .map(([author, body]: [string, string]) => ({
-                                Author: author || 'Unknown',
-                                Body: body || ''
-                            }))
-                            .filter((msg: { Body: { trim: () => { (): any; new(): any; length: number; }; }; }) => msg.Body.trim().length > 0);
-
-                        if (chatMessages.length > 0) {
-                            try {
-                                const summary = await summarize(chatMessages);
-                                if (summary) {
-                                    // Find the conversation in the original array and update it
-                                    const index = analytics.all_conversations.findIndex(c => c.id === conversationToSummarize.id);
-                                    if (index !== -1) {
-                                        analytics.all_conversations[index].summary = summary;
-                                    }
-                                    console.log(`Generated summary for conversation ${conversationToSummarize.name}`);
-                                }
-                            } catch (e) {
-                                console.error(`Failed to summarize conversation ${conversationToSummarize.name}`, e);
-                            }
-                        }
-                    }
-                }
-            }
         }
 
         // Standard Analytics Queries
+        if (onProgress) onProgress(30, 'Analyzing message patterns...');
         const byDayResults = db.exec(`SELECT DATE(sent_at/1000, 'unixepoch') as date, COUNT(*) as count FROM messages ${messagesWhereClause} GROUP BY date ORDER BY date ASC`);
         const byHourResults = db.exec(`SELECT strftime('%H', sent_at/1000, 'unixepoch') as hour, COUNT(*) as count FROM messages ${messagesWhereClause} GROUP BY hour ORDER BY hour ASC`);
         const topConvoResults = db.exec(`SELECT COALESCE(c.name, c.profileName, c.e164, c.id) as name, COUNT(m.rowid) as count FROM messages m JOIN conversations c ON m.conversationId = c.id ${messagesJoinWhereClause} GROUP BY name ORDER BY count DESC LIMIT 5`);
         const kpiResults = db.exec(`SELECT (SELECT COUNT(*) FROM messages ${messagesWhereClause}) as total_messages, (SELECT COUNT(*) FROM conversations ${conversationsWhereClause}) as total_conversations`);
         const reactionResults = db.exec(`SELECT emoji, fromId, COUNT(*) as count FROM reactions ${reactionsWhereClause} GROUP BY emoji, fromId`);
 
-        // Award Queries
-        const mostMessagesSentQuery = `SELECT sourceServiceId, COUNT(*) as count FROM messages ${messagesWhereClause ? `${messagesWhereClause} AND` : 'WHERE'} sourceServiceId IS NOT NULL GROUP BY sourceServiceId ORDER BY count DESC LIMIT 1`;
-        const mostReactionsGivenQuery = `SELECT fromId, COUNT(*) as count FROM reactions ${reactionsWhereClause ? `${reactionsWhereClause} AND` : 'WHERE'} fromId IS NOT NULL GROUP BY fromId ORDER BY count DESC LIMIT 1`;
-        const mostReactionsReceivedQuery = `SELECT targetAuthorAci, COUNT(*) as count FROM reactions ${reactionsWhereClause ? `${reactionsWhereClause} AND` : 'WHERE'} targetAuthorAci IS NOT NULL GROUP BY targetAuthorAci ORDER BY count DESC LIMIT 1`;
-        const mostMentionedQuery = `SELECT mn.mentionAci, COUNT(*) as count FROM mentions mn JOIN messages m ON mn.messageId = m.id JOIN conversations c ON mn.mentionAci = c.serviceId ${messagesJoinWhereClause} ${messagesJoinWhereClause ? 'AND' : 'WHERE'} mn.mentionAci IS NOT NULL GROUP BY mn.mentionAci ORDER BY count DESC LIMIT 1`;
-        const mostRepliedToQuery = `SELECT json_extract(m.json, '$.quote.author') as repliedToAuthor, COUNT(*) as count FROM messages m ${messagesJoinWhereClause} ${messagesJoinWhereClause ? 'AND' : 'WHERE'} json_extract(m.json, '$.quote.author') IS NOT NULL GROUP BY repliedToAuthor ORDER BY count DESC LIMIT 1`;
-        const mostMediaSentQuery = `SELECT sourceServiceId, COUNT(*) as count FROM messages ${messagesWhereClause ? `${messagesWhereClause} AND` : 'WHERE'} hasAttachments = 1 AND sourceServiceId IS NOT NULL GROUP BY sourceServiceId ORDER BY count DESC LIMIT 1`;
-
-        const [mostMessagesSent, mostReactionsGiven, mostReactionsReceived, mostMentioned, mostRepliedTo, mostMediaSent] = [
-            db.exec(mostMessagesSentQuery),
-            db.exec(mostReactionsGivenQuery),
-            db.exec(mostReactionsReceivedQuery),
-            db.exec(mostMentionedQuery),
-            db.exec(mostRepliedToQuery),
-            db.exec(mostMediaSentQuery),
-        ];
-
         // Process results
         if (byDayResults[0]) analytics.message_counts.by_day = Object.fromEntries(byDayResults[0].values);
         if (byHourResults[0]) analytics.message_counts.by_hour = Object.fromEntries(byHourResults[0].values);
         if (topConvoResults[0]) analytics.top_conversations = topConvoResults[0].values.map(([name, count]: [string, number]) => ({ name, count }));
+        
         if (kpiResults[0]) {
             const [total_messages, total_conversations] = kpiResults[0].values[0] as [number, number];
             analytics.kpis = {
@@ -318,6 +502,7 @@ export async function processDatabase(
                 avg_messages_per_day: Object.keys(analytics.message_counts.by_day).length ? Math.round(total_messages / Object.keys(analytics.message_counts.by_day).length) : 0,
             };
         }
+
         if (reactionResults[0]) {
             const emojiCounts: Record<string, number> = {};
             const authorEmojiCounts: Record<string, Record<string, number>> = {};
@@ -333,95 +518,42 @@ export async function processDatabase(
             }
         }
 
+        if (onProgress) onProgress(80, 'Generating awards...');
         // Process Award Results
-        if (mostMessagesSent[0]?.values[0]) {
-            const [winner, count] = mostMessagesSent[0].values[0] as [string, number];
-            analytics.awards.most_messages_sent = { winner, count };
-        }
-        if (mostReactionsGiven[0]?.values[0]) {
-            const [winner, count] = mostReactionsGiven[0].values[0] as [string, number];
-            analytics.awards.most_reactions_given = { winner, count };
-        }
-        if (mostReactionsReceived[0]?.values[0]) {
-            const [winner, count] = mostReactionsReceived[0].values[0] as [string, number];
-            analytics.awards.most_reactions_received = { winner, count };
-        }
-        if (mostMentioned[0]?.values[0]) {
-            const [winner, count] = mostMentioned[0].values[0] as [string, number];
-            analytics.awards.most_mentioned = { winner, count };
-        }
-        if (mostRepliedTo[0]?.values[0]) {
-            const [winner, count] = mostRepliedTo[0].values[0] as [string, number];
-            analytics.awards.most_replied_to = { winner, count };
-        }
-        if (mostMediaSent[0]?.values[0]) {
-            const [winner, count] = mostMediaSent[0].values[0] as [string, number];
-            analytics.awards.most_media_sent = { winner, count };
-        }
-
-        // KPI: Emotion-based Rankings
-        const calculateEmotionMetrics = (emojis: string[]): EmotionUserData[] => {
-            const query = `
-                WITH user_message_counts AS (
-                    SELECT sourceServiceId, COUNT(*) as total_messages_sent
-                    FROM messages
-                    GROUP BY sourceServiceId
-                ),
-                latest_emotion_reactions AS (
-                    SELECT
-                        messageId, targetAuthorAci, emoji,
-                        ROW_NUMBER() OVER(PARTITION BY fromId, messageId ORDER BY messageReceivedAt DESC) as rn
-                    FROM reactions
-                    WHERE emoji IN (${emojis.map(e => `'${e}'`).join(',')})
-                ),
-                user_emotion_reacts_received AS (
-                    SELECT targetAuthorAci, COUNT(*) as total_reacts
-                    FROM latest_emotion_reactions
-                    WHERE rn = 1
-                    GROUP BY targetAuthorAci
-                ),
-                global_avg_stats AS (
-                    SELECT
-                        AVG(COALESCE(uerr.total_reacts, 0)) as avg_reacts,
-                        AVG(COALESCE(umc.total_messages_sent, 0)) as avg_messages
-                    FROM user_message_counts umc
-                    LEFT JOIN user_emotion_reacts_received uerr ON umc.sourceServiceId = uerr.targetAuthorAci
-                )
-                SELECT
-                    c.profileFullName as name,
-                    COALESCE(uerr.total_reacts, 0) as total_reacts,
-                    CASE
-                        WHEN umc.total_messages_sent > 0 THEN CAST(COALESCE(uerr.total_reacts, 0) AS REAL) / umc.total_messages_sent
-                        ELSE 0
-                    END as rate,
-                    (CAST(COALESCE(uerr.total_reacts, 0) AS REAL) + (SELECT avg_reacts FROM global_avg_stats)) /
-                    (COALESCE(umc.total_messages_sent, 0) + (SELECT avg_messages FROM global_avg_stats)) as score
-                FROM conversations c
-                LEFT JOIN user_message_counts umc ON c.serviceId = umc.sourceServiceId
-                LEFT JOIN user_emotion_reacts_received uerr ON c.serviceId = uerr.targetAuthorAci
-                WHERE c.type = 'private' AND c.serviceId IS NOT NULL AND umc.total_messages_sent > 0
-                ORDER BY score DESC;
-            `;
-            const results = db.exec(query);
-            return results[0]
-                ? results[0].values.map((row: any) => ({
-                    name: row[0],
-                    totalReacts: row[1],
-                    rate: row[2],
-                    score: row[3],
-                }))
-                : [];
+        const awardQueries = {
+            most_messages_sent: `SELECT sourceServiceId, COUNT(*) as count FROM messages ${messagesWhereClause ? `${messagesWhereClause} AND` : 'WHERE'} sourceServiceId IS NOT NULL GROUP BY sourceServiceId ORDER BY count DESC LIMIT 1`,
+            most_reactions_given: `SELECT fromId, COUNT(*) as count FROM reactions ${reactionsWhereClause ? `${reactionsWhereClause} AND` : 'WHERE'} fromId IS NOT NULL GROUP BY fromId ORDER BY count DESC LIMIT 1`,
+            most_reactions_received: `SELECT targetAuthorAci, COUNT(*) as count FROM reactions ${reactionsWhereClause ? `${reactionsWhereClause} AND` : 'WHERE'} targetAuthorAci IS NOT NULL GROUP BY targetAuthorAci ORDER BY count DESC LIMIT 1`,
+            most_mentioned: `SELECT mn.mentionAci, COUNT(*) as count FROM mentions mn JOIN messages m ON mn.messageId = m.id JOIN conversations c ON mn.mentionAci = c.serviceId ${messagesJoinWhereClause} ${messagesJoinWhereClause ? 'AND' : 'WHERE'} mn.mentionAci IS NOT NULL GROUP BY mn.mentionAci ORDER BY count DESC LIMIT 1`,
+            most_replied_to: `SELECT json_extract(m.json, '$.quote.author') as repliedToAuthor, COUNT(*) as count FROM messages m ${messagesJoinWhereClause} ${messagesJoinWhereClause ? 'AND' : 'WHERE'} json_extract(m.json, '$.quote.author') IS NOT NULL GROUP BY repliedToAuthor ORDER BY count DESC LIMIT 1`,
+            most_media_sent: `SELECT sourceServiceId, COUNT(*) as count FROM messages ${messagesWhereClause ? `${messagesWhereClause} AND` : 'WHERE'} hasAttachments = 1 AND sourceServiceId IS NOT NULL GROUP BY sourceServiceId ORDER BY count DESC LIMIT 1`
         };
 
-        const laughEmojis = ['😂', '🤣', '😆', '😄'];
-        analytics.funniestUsers = calculateEmotionMetrics(laughEmojis);
+        interface AwardResult {
+            award: string;
+            result: [string, number] | undefined;
+        }
 
-        const shockEmojis = ['😮', '😲'];
-        analytics.mostShockingUsers = calculateEmotionMetrics(shockEmojis);
+        const awardResults = await Promise.all<AwardResult>(
+            Object.entries(awardQueries).map(async ([award, query]): Promise<AwardResult> => {
+                const results = db.exec(query);
+                return {
+                    award,
+                    result: results[0]?.values[0] as [string, number] | undefined
+                };
+            })
+        );
 
-        const loveEmojis = ['❤️', '😍', '🥰', '♥️'];
-        analytics.mostLovedUsers = calculateEmotionMetrics(loveEmojis);
+        awardResults.forEach(({ award, result }: AwardResult) => {
+            if (result) {
+                const [winner, count] = result;
+                (analytics.awards as any)[award] = { winner, count };
+            }
+        });
 
+        if (onProgress) onProgress(90, 'Finalizing analysis...');
+        debug.log('Analytics data generated successfully');
+        if (onProgress) onProgress(100, 'Analysis complete!');
         return analytics;
     } catch (error) {
         console.error('Error processing database:', error);
@@ -460,10 +592,11 @@ export interface IndividualStatsData {
 
 export async function getUsers(dbBuffer: ArrayBuffer): Promise<User[]> {
     try {
+        debug('Creating database from buffer...');
         const db = await createDatabaseFromBuffer(dbBuffer);
-
-        // Build a comprehensive name mapping from the conversations table
         const nameMap = new Map<string, string>();
+        
+        // Query to get user name mappings from conversations
         const nameMappingQuery = `
             SELECT id, serviceId, profileFullName, profileName
             FROM conversations
@@ -688,43 +821,78 @@ export async function getIndividualStats(dbBuffer: ArrayBuffer, userId: string):
 
 export async function loadUsers(
     dbBuffer: ArrayBuffer,
-    key?: string
+    key?: string,
+    onProgress?: ProgressCallback
 ): Promise<User[]> {
     const sqliteHeader = new Uint8Array([
         0x53, 0x51, 0x4c, 0x69, 0x74, 0x65, 0x20, 0x66, 0x6f, 0x72, 0x6d, 0x61, 0x74,
-        0x20, 0x33, 0x00,
+        0x20, 0x33, 0x00, // "SQLite format 3\0"
     ]);
     const fileHeader = new Uint8Array(dbBuffer.slice(0, 16));
-    const isDecrypted = fileHeader.length === sqliteHeader.length && fileHeader.every((byte, i) => byte === sqliteHeader[i]);
+    const isDecrypted = fileHeader.length === sqliteHeader.length && 
+                       fileHeader.every((byte, i) => byte === sqliteHeader[i]);
 
-    if (isDecrypted) {
-        return getUsers(dbBuffer);
-    } else if (key) {
-        const decryptedBuffer = await decryptDatabase(dbBuffer, key);
-        return getUsers(decryptedBuffer);
-    } else {
-        throw new Error('This database is encrypted. Please provide a key.');
+    try {
+        // First, check if we need to decrypt
+        if (!isDecrypted) {
+            if (!key) {
+                throw new Error('This database is encrypted. Please provide a key.');
+            }
+            if (onProgress) onProgress(0, 'Decrypting user data...');
+            // Decrypt the database
+            const decryptedBuffer = await decryptDatabase(dbBuffer, key, onProgress);
+            
+            // After decryption, load the users
+            if (onProgress) onProgress(90, 'Loading user data...');
+            const users = await getUsers(decryptedBuffer);
+            
+            if (onProgress) onProgress(100, 'User data loaded successfully');
+            return users;
+        } else {
+            // If already decrypted, just load the users
+            if (onProgress) onProgress(50, 'Loading user data...');
+            const users = await getUsers(dbBuffer);
+            
+            if (onProgress) onProgress(100, 'User data loaded successfully');
+            return users;
+        }
+    } catch (error) {
+        console.error('Error loading users:', error);
+        if (onProgress) onProgress(100, 'Error loading users');
+        throw new Error('Failed to load users. The database might be corrupted or the key is incorrect.');
     }
 }
 
 export async function loadIndividualStats(
     dbBuffer: ArrayBuffer,
     key: string | undefined,
-    userId: string
+    userId: string,
+    onProgress?: ProgressCallback
 ): Promise<IndividualStatsData> {
     const sqliteHeader = new Uint8Array([
         0x53, 0x51, 0x4c, 0x69, 0x74, 0x65, 0x20, 0x66, 0x6f, 0x72, 0x6d, 0x61, 0x74,
-        0x20, 0x33, 0x00,
+        0x20, 0x33, 0x00, // "SQLite format 3\0"
     ]);
     const fileHeader = new Uint8Array(dbBuffer.slice(0, 16));
-    const isDecrypted = fileHeader.length === sqliteHeader.length && fileHeader.every((byte, i) => byte === sqliteHeader[i]);
+    const isDecrypted = fileHeader.length === sqliteHeader.length && 
+                       fileHeader.every((byte, i) => byte === sqliteHeader[i]);
 
-    if (isDecrypted) {
-        return getIndividualStats(dbBuffer, userId);
-    } else if (key) {
-        const decryptedBuffer = await decryptDatabase(dbBuffer, key);
+    try {
+        let decryptedBuffer = dbBuffer;
+        
+        if (!isDecrypted) {
+            if (!key) {
+                throw new Error('This database is encrypted. Please provide a key.');
+            }
+            if (onProgress) onProgress(0, 'Decrypting user stats...');
+            decryptedBuffer = await decryptDatabase(dbBuffer, key, onProgress);
+        }
+        
+        if (onProgress) onProgress(100, 'Loading user stats...');
         return getIndividualStats(decryptedBuffer, userId);
-    } else {
-        throw new Error('This database is encrypted. Please provide a key.');
+    } catch (error) {
+        console.error('Error loading user stats:', error);
+        if (onProgress) onProgress(100, 'Error loading user stats');
+        throw new Error('Failed to load user stats. The database might be corrupted or the key is incorrect.');
     }
 }

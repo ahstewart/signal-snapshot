@@ -10,5 +10,8 @@
 # Log files
 *.log
 
+# Backup files
+*.bak
+
 # Environment variables
 .env*
