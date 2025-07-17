@@ -22,15 +22,15 @@ import { User, IndividualStatsData, loadUsers, loadIndividualStats } from '../ut
 interface IndividualStatsProps {
   users: any[];
   selectedUser: string;
-  setSelectedUser: React.Dispatch<React.SetStateAction<string>>;
-  statsData: any;
+  onUserSelect: (userId: string) => void;
+  data: any;
   loading: boolean;
   error: string | null;
 }
 
-const IndividualStats: React.FC<IndividualStatsProps> = ({ users, selectedUser, setSelectedUser, statsData, loading, error }) => {
+const IndividualStats: React.FC<IndividualStatsProps> = ({ users, selectedUser, onUserSelect, data, loading, error }) => {
   const handleUserChange = (event: SelectChangeEvent<string>) => {
-    setSelectedUser(event.target.value);
+    onUserSelect(event.target.value);
   };
 
 
@@ -74,48 +74,44 @@ const IndividualStats: React.FC<IndividualStatsProps> = ({ users, selectedUser, 
         </FormControl>
       )}
 
-      {statsData && (
+      {data && (
         <Grid container spacing={3}>
-          {renderKpiCard('Total Messages Sent', statsData.totalMessagesSent)}
-          {renderKpiCard('Most Popular Day', statsData.mostPopularDay)}
-          {renderKpiCard('Total Reactions Sent', statsData.totalReactionsSent)}
+          {renderKpiCard('Total Messages Sent', data.totalMessagesSent)}
+          {renderKpiCard('Most Popular Day', data.mostPopularDay)}
+          {renderKpiCard('Total Reactions Sent', data.totalReactionsSent)}
 
-          {statsData.reactedToMost && (
+          {data.reactedToMost && (
             <Grid item xs={12} md={6} lg={4}>
               <Paper sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', textAlign: 'center' }}>
                 <Typography variant="h6" color="text.secondary">Reacted To Most</Typography>
-                <Typography variant="h4">{statsData.reactedToMost.name}</Typography>
-                <Typography variant="body1" color="text.secondary">{statsData.reactedToMost.count} times</Typography>
-                <Typography variant="h5" sx={{ mt: 1 }}>{statsData.reactedToMost.emoji}</Typography>
+                <Typography variant="h4">{data.reactedToMost.name}</Typography>
+                <Typography variant="body1" color="text.secondary">{data.reactedToMost.count} times</Typography>
+                <Typography variant="h5" sx={{ mt: 1 }}>{data.reactedToMost.emoji}</Typography>
               </Paper>
             </Grid>
           )}
 
-          {statsData.receivedMostReactionsFrom && (
+          {data.receivedMostReactionsFrom && (
             <Grid item xs={12} md={6} lg={4}>
               <Paper sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', textAlign: 'center' }}>
                 <Typography variant="h6" color="text.secondary">Received Most Reactions From</Typography>
-                <Typography variant="h4">{statsData.receivedMostReactionsFrom.name}</Typography>
-                <Typography variant="body1" color="text.secondary">{statsData.receivedMostReactionsFrom.count} times</Typography>
-                <Typography variant="h5" sx={{ mt: 1 }}>{statsData.receivedMostReactionsFrom.emoji}</Typography>
+                <Typography variant="h4">{data.receivedMostReactionsFrom.name}</Typography>
+                <Typography variant="body1" color="text.secondary">{data.receivedMostReactionsFrom.count} times</Typography>
+                <Typography variant="h5" sx={{ mt: 1 }}>{data.receivedMostReactionsFrom.emoji}</Typography>
               </Paper>
             </Grid>
           )}
 
-          {statsData.mostPopularMessage && (
+          {data.mostPopularMessage && (
             <Grid item xs={12} md={12} lg={4}>
               <Paper sx={{ p: 2, height: '100%' }}>
-                <Typography variant="h6" color="text.secondary" gutterBottom>Most Popular Message</Typography>
-                <Typography variant="body1" sx={{ fontStyle: 'italic', mb: 1 }}>
-                  "{statsData.mostPopularMessage.text}"
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {statsData.mostPopularMessage.reactionCount} reactions
-                </Typography>
+                <Typography variant="h6" color="text.secondary">Most Popular Message</Typography>
+                <Typography variant="body1" sx={{ fontStyle: 'italic', mb: 2 }}>"{data.mostPopularMessage.text || 'Media message'}"</Typography>
+                <Typography variant="body2" color="text.secondary">{data.mostPopularMessage.reactionCount} reactions</Typography>
                 <Divider sx={{ my: 1 }} />
                 <Box sx={{ maxHeight: 200, overflow: 'auto' }}>
                   <List dense>
-                    {statsData.mostPopularMessage.reactions.map((reaction: any, index: number) => (
+                    {data.mostPopularMessage.reactions.map((reaction: any, index: number) => (
                       <ListItem key={index} disableGutters sx={{ py: 0 }}>
                         <ListItemText primary={`${reaction.emoji} from ${reaction.sender}`} />
                       </ListItem>

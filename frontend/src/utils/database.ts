@@ -5,7 +5,6 @@
 // Import CryptoJS for encryption/decryption
 import CryptoJS from 'crypto-js';
 // We will dynamically import sql.js inside the function to ensure it's loaded correctly.
-import { summarize, type ChatMessage } from './ai';
 import debug from 'debug';
 
 // Efficiently convert CryptoJS WordArray to Uint8Array (avoids memory issues for large files)

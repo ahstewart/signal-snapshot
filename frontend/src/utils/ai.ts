@@ -50,7 +50,7 @@ interface SummarizationResult {
 }
 
 // Define the expected structure for a single message object
-export interface ChatMessage {
+interface ChatMessage {
     Author: string;
     Body: string;
 }
@@ -64,8 +64,8 @@ export interface ChatMessage {
  */
 export async function summarize(
     messages: ChatMessage[], 
-    conversationId?: string,
     progress_callback?: (progress: any) => void,
+    conversationId?: string
 ): Promise<string | null> {
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
         console.warn('Summarization skipped: Input must be a non-empty array of messages.');
