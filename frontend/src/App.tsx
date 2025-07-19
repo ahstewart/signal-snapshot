@@ -2,14 +2,24 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Routes, Route, Link } from 'react-router-dom';
 import { 
     AppBar, 
+    Box, 
+    Button, 
+    Container, 
+    Drawer,
+    List,
+    ListItem,
+    ListItemButton,
+    ListItemIcon,
+    ListItemText,
     Toolbar, 
     Typography, 
-    Container, 
-    Button, 
     CircularProgress, 
-    Box, 
-    Alert
+    Alert,
+    LinearProgress,
+    Divider
 } from '@mui/material';
+import DashboardIcon from '@mui/icons-material/Dashboard';
+import PersonIcon from '@mui/icons-material/Person';
 import ProgressDialog from './components/ProgressDialog';
 import Dashboard from './components/Dashboard';
 import IndividualStats from './components/IndividualStats';
@@ -209,20 +219,18 @@ function App() {
         />
     ), [showProgress, progress, progressMessage]);
 
+    const drawerWidth = 240;
+
     return (
-        <div className="App">
+        <Box sx={{ display: 'flex', minHeight: '100vh' }}>
             {progressDialog}
-            <AppBar position="static">
+            
+            {/* App Bar */}
+            <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
                 <Toolbar>
                     <Typography variant="h6" component="div" sx={{ fontWeight: 'bold', mr: 3 }}>
                         Signal Snapshot
                     </Typography>
-                    <Button color="inherit" component={Link} to="/">
-                        Dashboard
-                    </Button>
-                    <Button color="inherit" component={Link} to="/individual">
-                        Individual Stats
-                    </Button>
                     
                     {/* Spacer to push the database info and button to the right */}
                     <Box sx={{ flexGrow: 1 }} />
@@ -281,7 +289,61 @@ function App() {
                 </Toolbar>
             </AppBar>
             
-            <Container sx={{ mt: 4 }}>
+            {/* Sidebar Navigation */}
+            {dbBuffer && (
+                <Drawer
+                    variant="permanent"
+                    sx={{
+                        width: drawerWidth,
+                        flexShrink: 0,
+                        [`& .MuiDrawer-paper`]: { 
+                            width: drawerWidth, 
+                            boxSizing: 'border-box',
+                            marginTop: '64px', // Height of the AppBar
+                            backgroundColor: '#f5f5f5',
+                            borderRight: '1px solid rgba(0, 0, 0, 0.12)'
+                        },
+                    }}
+                >
+                    <List>
+                        <ListItem disablePadding>
+                            <ListItemButton component={Link} to="/" selected={window.location.pathname === '/'}>
+                                <ListItemIcon>
+                                    <DashboardIcon />
+                                </ListItemIcon>
+                                <ListItemText primary="Dashboard" />
+                            </ListItemButton>
+                        </ListItem>
+                        <ListItem disablePadding>
+                            <ListItemButton 
+                                component={Link} 
+                                to="/individual" 
+                                selected={window.location.pathname === '/individual'}
+                            >
+                                <ListItemIcon>
+                                    <PersonIcon />
+                                </ListItemIcon>
+                                <ListItemText primary="Individual Stats" />
+                            </ListItemButton>
+                        </ListItem>
+                    </List>
+                </Drawer>
+            )}
+            
+            {/* Main Content */}
+            <Box 
+                component="main" 
+                sx={{ 
+                    flexGrow: 1, 
+                    p: 3,
+                    marginTop: '64px', // Height of the AppBar
+                    width: dbBuffer ? `calc(100% - ${drawerWidth}px)` : '100%',
+                    transition: (theme) => theme.transitions.create('width', {
+                        easing: theme.transitions.easing.sharp,
+                        duration: theme.transitions.duration.enteringScreen,
+                    })
+                }}
+            >
                 {error && (
                     <Alert severity="error" sx={{ mb: 2 }}>
                         {error}
@@ -335,8 +397,8 @@ function App() {
                         }
                     />
                 </Routes>
-            </Container>
-        </div>
+            </Box>
+        </Box>
     );
 }
 
