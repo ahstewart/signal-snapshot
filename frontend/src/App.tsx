@@ -23,6 +23,7 @@ function App() {
     const [dbKey, setDbKey] = useState<string | undefined>(undefined);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [currentDbName, setCurrentDbName] = useState<string>('No database loaded');
     
     // Progress state
     const [progress, setProgress] = useState(0);
@@ -43,6 +44,7 @@ function App() {
         if (!selectedFile) return;
         
         setFile(selectedFile);
+        setCurrentDbName(selectedFile.name);
         setError(null);
         setShowProgress(true);
         setProgress(0);
@@ -212,8 +214,8 @@ function App() {
             {progressDialog}
             <AppBar position="static">
                 <Toolbar>
-                    <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-                        Signal Analytics
+                    <Typography variant="h6" component="div" sx={{ fontWeight: 'bold', mr: 3 }}>
+                        Signal Snapshot
                     </Typography>
                     <Button color="inherit" component={Link} to="/">
                         Dashboard
@@ -221,6 +223,61 @@ function App() {
                     <Button color="inherit" component={Link} to="/individual">
                         Individual Stats
                     </Button>
+                    
+                    {/* Spacer to push the database info and button to the right */}
+                    <Box sx={{ flexGrow: 1 }} />
+                    
+                    {/* Only show database info and change button if a database is loaded */}
+                    {dbBuffer && (
+                        <>
+                            {/* Current database info */}
+                            <Typography 
+                                variant="body2" 
+                                component="div" 
+                                sx={{ 
+                                    color: 'rgba(255, 255, 255, 0.7)',
+                                    fontFamily: 'monospace',
+                                    fontSize: '0.8rem',
+                                    maxWidth: '200px',
+                                    whiteSpace: 'nowrap',
+                                    overflow: 'hidden',
+                                    textOverflow: 'ellipsis',
+                                    mr: 1
+                                }}
+                                title={currentDbName}
+                            >
+                                {currentDbName}
+                            </Typography>
+                            
+                            {/* Hidden file input for database upload */}
+                            <input
+                                type="file"
+                                accept=".db,.sqlite,.sqlite3"
+                                onChange={handleFileChange}
+                                style={{ display: 'none' }}
+                                id="change-db-input"
+                                key={currentDbName} // Force re-render to clear the input when changing files
+                            />
+                            <Button 
+                                variant="contained"
+                                color="primary"
+                                onClick={() => document.getElementById('change-db-input')?.click()}
+                                sx={{
+                                    ml: 2,
+                                    backgroundColor: 'white',
+                                    color: 'primary.main',
+                                    '&:hover': {
+                                        backgroundColor: '#f5f5f5',
+                                        boxShadow: '0px 2px 4px -1px rgba(0,0,0,0.2), 0px 4px 5px 0px rgba(0,0,0,0.14), 0px 1px 10px 0px rgba(0,0,0,0.12)'
+                                    },
+                                    textTransform: 'none',
+                                    fontWeight: 500
+                                }}
+                            >
+                                Change Database
+                            </Button>
+                        </>
+                    )}
                 </Toolbar>
             </AppBar>
             
