@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Routes, Route, Link } from 'react-router-dom';
+import { useNavigate, Routes, Route, Link } from 'react-router-dom';
 import { 
     AppBar, 
     Box, 
@@ -21,10 +21,12 @@ import {
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import PersonIcon from '@mui/icons-material/Person';
 import SummarizeIcon from '@mui/icons-material/Summarize';
+import ChatIcon from '@mui/icons-material/Chat'; // Add this import
 import ProgressDialog from './components/ProgressDialog';
 import Dashboard from './components/Dashboard';
 import IndividualStats from './components/IndividualStats';
 import SummaryPage from './components/SummaryPage';
+import OneOnOnesPage from './components/OneOnOnesPage'; // Add this import
 import './App.css';
 import { AnalyticsData, IndividualStatsData, loadDatabase, loadIndividualStats, loadUsers, User } from './utils/database';
 
@@ -49,6 +51,12 @@ function App() {
     const [selectedConversationIds, setSelectedConversationIds] = useState<string[]>([]);
     const [selectedUser, setSelectedUser] = useState<string>('');
     const [statsData, setStatsData] = useState<IndividualStatsData | null>(null);
+
+    // For SummaryPage, always pass the original, unfiltered analyticsData
+    // Store the original analyticsData when loaded
+    const [originalAnalyticsData, setOriginalAnalyticsData] = useState<AnalyticsData | null>(null);
+
+    const navigate = useNavigate(); // Add this hook
 
     // Handlers
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
@@ -81,6 +89,9 @@ function App() {
                 // File is not encrypted
                 setDbKey(undefined);
             }
+
+            // After successful file upload, navigate to Summary page
+            navigate('/summary');
         } catch (err) {
             setError(`Error reading file: ${err instanceof Error ? err.message : 'Unknown error'}`);
             setShowProgress(false);
@@ -116,8 +127,8 @@ function App() {
                         setProgressMessage(m);
                     }
                 );
-                
                 setAnalyticsData(analytics);
+                setOriginalAnalyticsData(analytics); // Save the original, unfiltered data
                 setInitialDataLoaded(true);
                 setProgress(100);
                 
@@ -292,53 +303,75 @@ function App() {
             </AppBar>
             
             {/* Sidebar Navigation */}
-            {dbBuffer && (
-                <Drawer
-                    variant="permanent"
-                    sx={{
-                        width: drawerWidth,
-                        flexShrink: 0,
-                        [`& .MuiDrawer-paper`]: { 
-                            width: drawerWidth, 
-                            boxSizing: 'border-box',
-                            marginTop: '64px', // Height of the AppBar
-                            backgroundColor: '#f5f5f5',
-                            borderRight: '1px solid rgba(0, 0, 0, 0.12)'
-                        },
-                    }}
-                >
-                    <List>
-                        <ListItem disablePadding>
-                            <ListItemButton component={Link} to="/summary" selected={window.location.pathname === '/summary'}>
-                                <ListItemIcon>
-                                    <SummarizeIcon />
-                                </ListItemIcon>
-                                <ListItemText primary="Summary" />
-                            </ListItemButton>
-                        </ListItem>
-                        <ListItem disablePadding>
-                            <ListItemButton component={Link} to="/" selected={window.location.pathname === '/'}>
-                                <ListItemIcon>
-                                    <DashboardIcon />
-                                </ListItemIcon>
-                                <ListItemText primary="Group Chats" />
-                            </ListItemButton>
-                        </ListItem>
-                        <ListItem disablePadding>
-                            <ListItemButton 
-                                component={Link} 
-                                to="/individual" 
-                                selected={window.location.pathname === '/individual'}
-                            >
-                                <ListItemIcon>
-                                    <PersonIcon />
-                                </ListItemIcon>
-                                <ListItemText primary="Individuals" />
-                            </ListItemButton>
-                        </ListItem>
-                    </List>
-                </Drawer>
-            )}
+            <Drawer
+                variant="permanent"
+                sx={{
+                    width: drawerWidth,
+                    flexShrink: 0,
+                    [`& .MuiDrawer-paper`]: { 
+                        width: drawerWidth, 
+                        boxSizing: 'border-box',
+                        marginTop: '64px', // Height of the AppBar
+                        backgroundColor: '#f5f5f5',
+                        borderRight: '1px solid rgba(0, 0, 0, 0.12)'
+                    },
+                }}
+            >
+                <List>
+                    <ListItem disablePadding>
+                        <ListItemButton 
+                            component={Link} 
+                            to="/summary" 
+                            selected={window.location.pathname === '/summary'}
+                            disabled={!dbBuffer}
+                        >
+                            <ListItemIcon>
+                                <SummarizeIcon />
+                            </ListItemIcon>
+                            <ListItemText primary="Summary" />
+                        </ListItemButton>
+                    </ListItem>
+                    <ListItem disablePadding>
+                        <ListItemButton 
+                            component={Link} 
+                            to="/" 
+                            selected={window.location.pathname === '/'}
+                            disabled={!dbBuffer}
+                        >
+                            <ListItemIcon>
+                                <DashboardIcon />
+                            </ListItemIcon>
+                            <ListItemText primary="Group Chats" />
+                        </ListItemButton>
+                    </ListItem>
+                    <ListItem disablePadding>
+                        <ListItemButton 
+                            component={Link} 
+                            to="/oneonones"
+                            selected={window.location.pathname === '/oneonones'}
+                            disabled={!dbBuffer}
+                        >
+                            <ListItemIcon>
+                                <ChatIcon />
+                            </ListItemIcon>
+                            <ListItemText primary="One-on-Ones" />
+                        </ListItemButton>
+                    </ListItem>
+                    <ListItem disablePadding>
+                        <ListItemButton 
+                            component={Link} 
+                            to="/individual" 
+                            selected={window.location.pathname === '/individual'}
+                            disabled={!dbBuffer}
+                        >
+                            <ListItemIcon>
+                                <PersonIcon />
+                            </ListItemIcon>
+                            <ListItemText primary="Individual Stats" />
+                        </ListItemButton>
+                    </ListItem>
+                </List>
+            </Drawer>
             
             {/* Main Content */}
             <Box 
@@ -347,7 +380,7 @@ function App() {
                     flexGrow: 1, 
                     p: 3,
                     marginTop: '64px', // Height of the AppBar
-                    width: dbBuffer ? `calc(100% - ${drawerWidth}px)` : '100%',
+                    width: `calc(100% - ${drawerWidth}px)`,
                     transition: (theme) => theme.transitions.create('width', {
                         easing: theme.transitions.easing.sharp,
                         duration: theme.transitions.duration.enteringScreen,
@@ -376,48 +409,61 @@ function App() {
                         </label>
                     </Box>
                 )}
-                
-                <Routes>
-                    <Route
-                        path="/summary"
-                        element={
-                            <SummaryPage
-                                data={analyticsData}
-                                loading={loading}
-                                error={error}
-                                users={users}
-                            />
-                        }
-                    />
-                    <Route
-                        path="/"
-                        element={
-                            <Dashboard
-                                data={analyticsData}
-                                loading={loading}
-                                error={error}
-                                selectedConversationIds={selectedConversationIds}
-                                onConversationSelect={setSelectedConversationIds}
-                                users={users}
-                                selectedUser={selectedUser}
-                                onUserSelect={setSelectedUser}
-                            />
-                        }
-                    />
-                    <Route
-                        path="/individual"
-                        element={
-                            <IndividualStats
-                                data={statsData}
-                                loading={loading}
-                                error={error}
-                                users={users}
-                                selectedUser={selectedUser}
-                                onUserSelect={setSelectedUser}
-                            />
-                        }
-                    />
-                </Routes>
+
+                {dbBuffer && (
+                    <Routes>
+                        <Route
+                            path="/summary"
+                            element={
+                                <SummaryPage
+                                    data={originalAnalyticsData}
+                                    loading={loading}
+                                    error={error}
+                                    users={users}
+                                />
+                            }
+                        />
+                        <Route
+                            path="/"
+                            element={
+                                <Dashboard
+                                    data={analyticsData}
+                                    loading={loading}
+                                    error={error}
+                                    selectedConversationIds={selectedConversationIds}
+                                    onConversationSelect={setSelectedConversationIds}
+                                    users={users}
+                                    selectedUser={selectedUser}
+                                    onUserSelect={setSelectedUser}
+                                />
+                            }
+                        />
+                        <Route
+                            path="/oneonones"
+                            element={
+                                <OneOnOnesPage
+                                    data={analyticsData}
+                                    loading={loading}
+                                    error={error}
+                                    users={users}
+                                />
+                            }
+                        />
+                        <Route
+                            path="/individual"
+                            element={
+                                <IndividualStats
+                                    data={statsData}
+                                    loading={loading}
+                                    error={error}
+                                    users={users}
+                                    selectedUser={selectedUser}
+                                    onUserSelect={setSelectedUser}
+                                />
+                            }
+                        />
+                    </Routes>
+                )}
             </Box>
         </Box>
     );

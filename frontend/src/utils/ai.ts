@@ -50,7 +50,7 @@ interface SummarizationResult {
 }
 
 // Define the expected structure for a single message object
-interface ChatMessage {
+export interface ChatMessage {
     Author: string;
     Body: string;
 }

@@ -10,6 +10,7 @@ interface SummaryPageProps {
 }
 
 const SummaryPage: React.FC<SummaryPageProps> = ({ data, loading, error, users }) => {
+    // Always use the full analytics data, not filtered by selection
     const renderKpiCard = (title: string, value: string | number) => (
         <Grid item xs={12} sm={4}>
             <Paper sx={{ p: 2, textAlign: 'center' }}>

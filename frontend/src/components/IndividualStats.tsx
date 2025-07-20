@@ -16,8 +16,6 @@ import {
   Select,
   SelectChangeEvent,
   Typography,
-  Autocomplete,
-  TextField,
 } from '@mui/material';
 import { User, IndividualStatsData, loadUsers, loadIndividualStats } from '../utils/database';
 
@@ -31,9 +29,11 @@ interface IndividualStatsProps {
 }
 
 const IndividualStats: React.FC<IndividualStatsProps> = ({ users, selectedUser, onUserSelect, data, loading, error }) => {
-  const handleUserChange = (event: any, value: string | null) => {
-    onUserSelect(value || '');
+  const handleUserChange = (event: SelectChangeEvent<string>) => {
+    onUserSelect(event.target.value);
   };
+
+
   const renderKpiCard = (title: string, value: string | number) => (
     <Grid item xs={12} sm={4}>
       <Paper sx={{ p: 2, textAlign: 'center' }}>
@@ -46,7 +46,7 @@ const IndividualStats: React.FC<IndividualStatsProps> = ({ users, selectedUser, 
   return (
     <Box sx={{ p: 4 }}>
       <Typography variant="h4" gutterBottom>
-        Individuals
+        Individual Stats
       </Typography>
       {selectedUser && (
         <Typography variant="h6" gutterBottom>
@@ -57,18 +57,21 @@ const IndividualStats: React.FC<IndividualStatsProps> = ({ users, selectedUser, 
       {/* Upload controls removed; now in header */}
 
       {users.length > 0 && (
-        <Autocomplete
-          options={users.map(user => user.id)}
-          getOptionLabel={(id) => {
-            const user = users.find(u => u.id === id);
-            return user?.name || id;
-          }}
-          value={selectedUser || null}
-          onChange={handleUserChange}
-          renderInput={(params) => <TextField {...params} label="Select a person" />}
-          isOptionEqualToValue={(option, value) => option === value}
-          sx={{ mb: 4 }}
-        />
+        <FormControl fullWidth sx={{ mb: 4 }}>
+          <InputLabel id="user-select-label">Select User</InputLabel>
+          <Select
+            labelId="user-select-label"
+            value={selectedUser}
+            label="Select User"
+            onChange={handleUserChange}
+          >
+            {users.map(user => (
+              <MenuItem key={user.id} value={user.id}>
+                {user.name}
+              </MenuItem>
+            ))}
+          </Select>
+        </FormControl>
       )}
 
       {data && (

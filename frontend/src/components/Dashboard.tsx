@@ -167,10 +167,22 @@ const Dashboard: React.FC<DashboardProps> = ({
   }
 
   function renderKpiSummary() {
+    // "Total Members" is the number of users in the selected conversation
+    let totalMembers = 0;
+    if (
+      analyticsData?.all_conversations &&
+      analyticsData.all_conversations.length > 0 &&
+      selectedConversationIds.length === 1
+    ) {
+      const convo = analyticsData.all_conversations.find(c => c.id === selectedConversationIds[0]);
+      // If you have a memberCount property, use it; otherwise, fallback to 0
+      totalMembers = convo && (convo as any).memberCount ? (convo as any).memberCount : 0;
+    }
+
     return (
       <Grid container spacing={3} sx={{ mb: 4 }}>
         {renderKpiCard('Total Messages', analyticsData?.kpis.total_messages ?? '...')}
-        {renderKpiCard('Total Conversations', analyticsData?.kpis.total_conversations ?? '...')}
+        {renderKpiCard('Total Members', totalMembers)}
         {renderKpiCard('Avg Messages / Day', analyticsData?.kpis.avg_messages_per_day ?? '...')}
       </Grid>
     );
@@ -432,30 +444,6 @@ const Dashboard: React.FC<DashboardProps> = ({
     return <Typography>No data available.</Typography>;
   }
 
-  if (loading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
-        <CircularProgress />
-      </Box>
-    );
-  }
-
-  if (error) {
-    return (
-      <Box sx={{ p: 3 }}>
-        <Alert severity="error">{error}</Alert>
-      </Box>
-    );
-  }
-
-  if (!analyticsData) {
-    return (
-      <Box sx={{ p: 3 }}>
-        <Alert severity="info">No data available. Please upload a Signal database to get started.</Alert>
-      </Box>
-    );
-  }
-
   return (
     <Box sx={{ p: 3 }}>
       <Typography variant="h4" gutterBottom>
@@ -481,11 +469,8 @@ const Dashboard: React.FC<DashboardProps> = ({
 
       {renderKpiSummary()}
       <Grid container spacing={3} sx={{ mt: 2 }}>
-        <Grid item xs={12} md={8}>
+        <Grid item xs={12}>
           {renderDailyChart()}
-        </Grid>
-        <Grid item xs={12} md={4}>
-          {renderTopConversations()}
         </Grid>
         <Grid item xs={12}>
            {renderHourlyChart()}
@@ -496,6 +481,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         <Grid item xs={12}>
           {renderAwards()}
         </Grid>
+        {/* Restore EmotionRankings sections */}
         <Grid item xs={12}>
           <EmotionRankings
             title="😂 Who is the Funniest? 😂"
