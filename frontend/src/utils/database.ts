@@ -470,7 +470,7 @@ export async function processDatabase(
         
         // Process conversations
         if (onProgress) onProgress(25, 'Loading conversations...');
-        const conversationsQuery = `SELECT id, name FROM conversations ${conversationsWhereClause}`;
+        const conversationsQuery = `SELECT id, name, json_extract(json, '$.messageCount') as messageCount FROM conversations where type != 'private' ORDER BY messageCount DESC`;
         const conversationsResults = db.exec(conversationsQuery);
         if (conversationsResults[0]) {
             const conversations: Conversation[] = conversationsResults[0].values.map(([id, name]: [string, string]) => ({
