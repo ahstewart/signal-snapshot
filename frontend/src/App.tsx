@@ -20,9 +20,11 @@ import {
 } from '@mui/material';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import PersonIcon from '@mui/icons-material/Person';
+import SummarizeIcon from '@mui/icons-material/Summarize';
 import ProgressDialog from './components/ProgressDialog';
 import Dashboard from './components/Dashboard';
 import IndividualStats from './components/IndividualStats';
+import SummaryPage from './components/SummaryPage';
 import './App.css';
 import { AnalyticsData, IndividualStatsData, loadDatabase, loadIndividualStats, loadUsers, User } from './utils/database';
 
@@ -307,11 +309,19 @@ function App() {
                 >
                     <List>
                         <ListItem disablePadding>
+                            <ListItemButton component={Link} to="/summary" selected={window.location.pathname === '/summary'}>
+                                <ListItemIcon>
+                                    <SummarizeIcon />
+                                </ListItemIcon>
+                                <ListItemText primary="Summary" />
+                            </ListItemButton>
+                        </ListItem>
+                        <ListItem disablePadding>
                             <ListItemButton component={Link} to="/" selected={window.location.pathname === '/'}>
                                 <ListItemIcon>
                                     <DashboardIcon />
                                 </ListItemIcon>
-                                <ListItemText primary="Dashboard" />
+                                <ListItemText primary="Group Chats" />
                             </ListItemButton>
                         </ListItem>
                         <ListItem disablePadding>
@@ -323,7 +333,7 @@ function App() {
                                 <ListItemIcon>
                                     <PersonIcon />
                                 </ListItemIcon>
-                                <ListItemText primary="Individual Stats" />
+                                <ListItemText primary="Individuals" />
                             </ListItemButton>
                         </ListItem>
                     </List>
@@ -368,6 +378,17 @@ function App() {
                 )}
                 
                 <Routes>
+                    <Route
+                        path="/summary"
+                        element={
+                            <SummaryPage
+                                data={analyticsData}
+                                loading={loading}
+                                error={error}
+                                users={users}
+                            />
+                        }
+                    />
                     <Route
                         path="/"
                         element={

@@ -32,6 +32,7 @@ import {
   CartesianGrid,
   Tooltip,
 } from 'recharts';
+import { Autocomplete, TextField } from '@mui/material';
 
 import { loadDatabase, Conversation, AnalyticsData, EmotionUserData, User } from '../utils/database';
 
@@ -64,12 +65,8 @@ const Dashboard: React.FC<DashboardProps> = ({
   selectedUser,
   onUserSelect
 }: DashboardProps) => {
-  const handleConversationChange = (event: SelectChangeEvent<string[]>) => {
-    const { target: { value } } = event;
-    onConversationSelect(
-      // On autofill we get a stringified value.
-      typeof value === 'string' ? value.split(',') : value,
-    );
+  const handleConversationChange = (event: any, value: string | null) => {
+    onConversationSelect(value ? [value] : []);
   };
 
   // ---------------------------------------------------------------------------
@@ -462,35 +459,22 @@ const Dashboard: React.FC<DashboardProps> = ({
   return (
     <Box sx={{ p: 3 }}>
       <Typography variant="h4" gutterBottom>
-        Signal Analytics Dashboard
+        Group Chats
       </Typography>
 
       {analyticsData.all_conversations && (
         <Box sx={{ mb: 4 }}>
-          <FormControl fullWidth>
-            <InputLabel id="conversation-filter-label">Filter by Conversation</InputLabel>
-            <Select
-              labelId="conversation-filter-label"
-              multiple
-              value={selectedConversationIds}
-              onChange={handleConversationChange}
-              renderValue={(selected) => (
-                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                  {(selected as string[]).map((value) => {
-                    const conversation = analyticsData.all_conversations.find((c: Conversation) => c.id === value);
-                    return <Chip key={value} label={conversation?.name || value} />;
-                  })}
-                </Box>
-              )}
-            >
-              {analyticsData.all_conversations.map((convo: Conversation) => (
-                <MenuItem key={convo.id} value={convo.id}>
-                  <Checkbox checked={selectedConversationIds.indexOf(convo.id) > -1} />
-                  <ListItemText primary={convo.name} />
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
+          <Autocomplete
+            options={analyticsData.all_conversations.map((convo: Conversation) => convo.id)}
+            getOptionLabel={(id) => {
+              const conversation = analyticsData.all_conversations.find((c: Conversation) => c.id === id);
+              return conversation?.name || id;
+            }}
+            value={selectedConversationIds[0] || null}
+            onChange={handleConversationChange}
+            renderInput={(params) => <TextField {...params} label="Filter by Conversation" />}
+            isOptionEqualToValue={(option, value) => option === value}
+          />
           {renderConversationSummary()}
         </Box>
       )}
@@ -539,8 +523,6 @@ const Dashboard: React.FC<DashboardProps> = ({
       </Grid>
     </Box>
   );
-
-
 };
 
 export default Dashboard;
