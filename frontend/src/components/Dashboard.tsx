@@ -468,51 +468,54 @@ const Dashboard: React.FC<DashboardProps> = ({
         </Box>
       )}
 
-      {renderKpiSummary()}
-      <Grid container spacing={3} sx={{ mt: 2 }}>
-        <Grid item xs={12}>
-          {renderDailyChart()}
-        </Grid>
-        <Grid item xs={12}>
-           {renderHourlyChart()}
-        </Grid>
-        <Grid item xs={12}>
-          {renderReactionAnalytics()}
-        </Grid>
-        <Grid item xs={12}>
-          {renderAwards()}
-        </Grid>
-        {/* Restore EmotionRankings sections */}
-        {analyticsData && (
-          <>
+      {/* Only show content if a conversation is selected */}
+      {selectedConversationIds.length === 1 && (
+        <>
+          {renderKpiSummary()}
+          <Grid container spacing={3} sx={{ mt: 2 }}>
             <Grid item xs={12}>
-              <EmotionRankings
-                title="😂 Who is the Funniest? 😂"
-                data={analyticsData.funniestUsers}
-                scoreLabel="Humor Score"
-                totalReactsLabel="Total Laugh Reacts"
-              />
+              {renderDailyChart()}
             </Grid>
             <Grid item xs={12}>
-              <EmotionRankings
-                title="😮 Who is the Most Shocking? 😮"
-                data={analyticsData.mostShockingUsers}
-                scoreLabel="Shock Score"
-                totalReactsLabel="Total Shock Reacts"
-              />
+              {renderHourlyChart()}
             </Grid>
             <Grid item xs={12}>
-              <EmotionRankings
-                title="❤️ Who is the Most Loved? ❤️"
-                data={analyticsData.mostLovedUsers}
-                scoreLabel="Love Score"
-                totalReactsLabel="Total Love Reacts"
-              />
+              {renderReactionAnalytics()}
             </Grid>
-
-          </>
-        )}
-      </Grid>
+            <Grid item xs={12}>
+              {renderAwards()}
+            </Grid>
+            {analyticsData && (
+              <>
+                <Grid item xs={12}>
+                  <EmotionRankings
+                    title="😂 Who is the Funniest? 😂"
+                    data={analyticsData.funniestUsers}
+                    scoreLabel="Humor Score"
+                    totalReactsLabel="Total Laugh Reacts"
+                  />
+                </Grid>
+                <Grid item xs={12}>
+                  <EmotionRankings
+                    title="😮 Who is the Most Shocking? 😮"
+                    data={analyticsData.mostShockingUsers}
+                    scoreLabel="Shock Score"
+                    totalReactsLabel="Total Shock Reacts"
+                  />
+                </Grid>
+                <Grid item xs={12}>
+                  <EmotionRankings
+                    title="❤️ Who is the Most Loved? ❤️"
+                    data={analyticsData.mostLovedUsers}
+                    scoreLabel="Love Score"
+                    totalReactsLabel="Total Love Reacts"
+                  />
+                </Grid>
+              </>
+            )}
+          </Grid>
+        </>
+      )}
     </Box>
   );
 };
