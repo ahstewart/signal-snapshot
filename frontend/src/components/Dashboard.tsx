@@ -92,7 +92,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   
   // Use the data prop as analyticsData for backward compatibility
   const analyticsData = data;
-  
+
   // Helper function to safely access analyticsData properties
   const getAnalyticsData = <T,>(getter: (data: AnalyticsData) => T, defaultValue: T): T => {
     return analyticsData ? getter(analyticsData) : defaultValue;
@@ -167,16 +167,17 @@ const Dashboard: React.FC<DashboardProps> = ({
   }
 
   function renderKpiSummary() {
-    // "Total Members" is the number of users in the selected conversation
     let totalMembers = 0;
-    if (
-      analyticsData?.all_conversations &&
-      analyticsData.all_conversations.length > 0 &&
-      selectedConversationIds.length === 1
-    ) {
-      const convo = analyticsData.all_conversations.find(c => c.id === selectedConversationIds[0]);
-      // If you have a memberCount property, use it; otherwise, fallback to 0
-      totalMembers = convo && (convo as any).memberCount ? (convo as any).memberCount : 0;
+
+    if (selectedConversationIds.length === 1) {
+      // If a single conversation is selected, show its member count
+      const selectedConvo = analyticsData?.all_conversations.find(
+        c => c.id === selectedConversationIds[0]
+      );
+      totalMembers = selectedConvo?.memberCount || 0;
+    } else {
+      // Otherwise, show the total members from all processed conversations
+      totalMembers = analyticsData?.kpis.total_members || 0;
     }
 
     return (
@@ -190,7 +191,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   function renderDailyChart() {
     return (
-      <Paper sx={{ p: 2, height: 400 }}>
+      <Paper sx={{ p: 5, height: 400 }}>
         <Typography variant="h6" gutterBottom>Daily Message Activity</Typography>
         {analyticsData?.message_counts?.by_day ? (
           <ResponsiveContainer width="100%" height="100%">
@@ -209,7 +210,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   function renderHourlyChart() {
     return (
-      <Paper sx={{ p: 2, height: 400 }}>
+      <Paper sx={{ p: 5, height: 400 }}>
         <Typography variant="h6" gutterBottom>Hourly Activity</Typography>
         {analyticsData?.message_counts?.by_hour ? (
           <ResponsiveContainer width="100%" height="100%">
@@ -356,7 +357,7 @@ const Dashboard: React.FC<DashboardProps> = ({
       most_reactions_given: "Most Reactions Given",
       most_reactions_received: "Most Reactions Received",
       most_mentioned: "Most Mentioned",
-      most_replied_to: "Most Replied To",
+      most_mentions_made: "Most Mentions Made",
       most_media_sent: "Most Media Sent",
     };
 
@@ -482,30 +483,35 @@ const Dashboard: React.FC<DashboardProps> = ({
           {renderAwards()}
         </Grid>
         {/* Restore EmotionRankings sections */}
-        <Grid item xs={12}>
-          <EmotionRankings
-            title="😂 Who is the Funniest? 😂"
-            data={analyticsData.funniestUsers}
-            scoreLabel="Humor Score"
-            totalReactsLabel="Total Laugh Reacts"
-          />
-        </Grid>
-        <Grid item xs={12}>
-          <EmotionRankings
-            title="😮 Who is the Most Shocking? 😮"
-            data={analyticsData.mostShockingUsers}
-            scoreLabel="Shock Score"
-            totalReactsLabel="Total Shock Reacts"
-          />
-        </Grid>
-        <Grid item xs={12}>
-          <EmotionRankings
-            title="❤️ Who is the Most Loved? ❤️"
-            data={analyticsData.mostLovedUsers}
-            scoreLabel="Love Score"
-            totalReactsLabel="Total Love Reacts"
-          />
-        </Grid>
+        {analyticsData && (
+          <>
+            <Grid item xs={12}>
+              <EmotionRankings
+                title="😂 Who is the Funniest? 😂"
+                data={analyticsData.funniestUsers}
+                scoreLabel="Humor Score"
+                totalReactsLabel="Total Laugh Reacts"
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <EmotionRankings
+                title="😮 Who is the Most Shocking? 😮"
+                data={analyticsData.mostShockingUsers}
+                scoreLabel="Shock Score"
+                totalReactsLabel="Total Shock Reacts"
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <EmotionRankings
+                title="❤️ Who is the Most Loved? ❤️"
+                data={analyticsData.mostLovedUsers}
+                scoreLabel="Love Score"
+                totalReactsLabel="Total Love Reacts"
+              />
+            </Grid>
+
+          </>
+        )}
       </Grid>
     </Box>
   );

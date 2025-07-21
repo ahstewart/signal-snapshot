@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Typography, Paper, CircularProgress, Alert, Grid, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
-import { AnalyticsData, User } from '../utils/database';
+import { AnalyticsData, User, UserActivity } from '../utils/database';
 
 interface SummaryPageProps {
     data: AnalyticsData | null;
@@ -10,6 +10,39 @@ interface SummaryPageProps {
 }
 
 const SummaryPage: React.FC<SummaryPageProps> = ({ data, loading, error, users }) => {
+    function renderTopUsersTable(title: string, data: UserActivity[], countLabel: string) {
+    if (!data || data.length === 0) return null;
+
+    return (
+      <Box sx={{ mt: 4 }}>
+        <Typography variant="h6" gutterBottom>
+          {title}
+        </Typography>
+        <Paper sx={{ p: 2 }}>
+          <TableContainer>
+            <Table stickyHeader size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>User</TableCell>
+                  <TableCell align="right">{countLabel}</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {data.map((user: UserActivity) => (
+                  <TableRow key={user.name}>
+                    <TableCell component="th" scope="row">
+                      {user.name}
+                    </TableCell>
+                    <TableCell align="right">{user.count}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Paper>
+      </Box>
+    );
+  }
     // Always use the full analytics data, not filtered by selection
     const renderKpiCard = (title: string, value: string | number) => (
         <Grid item xs={12} sm={4}>
@@ -72,6 +105,22 @@ const SummaryPage: React.FC<SummaryPageProps> = ({ data, loading, error, users }
                             <Typography variant="body2" color="text.secondary">No data</Typography>
                         )}
                     </Paper>
+                    <Grid container spacing={3} sx={{ mt: 0 }}>
+                         <Grid item xs={12} md={6}>
+                            {renderTopUsersTable(
+                                'Top Users by Message Count',
+                                data.topUsersByMessageCount,
+                                'Messages Sent'
+                            )}
+                        </Grid>
+                        <Grid item xs={12} md={6}>
+                            {renderTopUsersTable(
+                                'Top Users by Reaction Count',
+                                data.topUsersByReactionCount,
+                                'Reactions Given'
+                            )}
+                        </Grid>
+                    </Grid>
                 </>
             )}
         </Box>

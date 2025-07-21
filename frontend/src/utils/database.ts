@@ -72,10 +72,16 @@ export interface Conversation {
     id: string;
     name: string;
     summary?: string;
+    memberCount?: number;
 }
 
 export interface Award {
     winner: string | null;
+    count: number;
+}
+
+export interface UserActivity {
+    name: string;
     count: number;
 }
 
@@ -100,6 +106,7 @@ export interface AnalyticsData {
         total_messages: number;
         total_conversations: number;
         avg_messages_per_day: number;
+        total_members: number;
     };
     reactions: {
         total_reactions: number;
@@ -111,12 +118,14 @@ export interface AnalyticsData {
         most_reactions_given: Award;
         most_reactions_received: Award;
         most_mentioned: Award;
-        most_replied_to: Award;
+        most_mentions_made: Award;
         most_media_sent: Award;
     };
     funniestUsers: EmotionUserData[];
     mostShockingUsers: EmotionUserData[];
     mostLovedUsers: EmotionUserData[];
+    topUsersByMessageCount: UserActivity[];
+    topUsersByReactionCount: UserActivity[];
 }
 
 // Type for progress callback
@@ -408,46 +417,56 @@ export async function processDatabase(
         
         debug.log('Database created successfully');
         if (onProgress) onProgress(20, 'Database loaded, processing data...');
-        
-        const buildWhereClause = (tableAlias?: string, idColumn: string = 'conversationId') => {
-            debug.log(`Building WHERE clause for ${tableAlias || 'default'} with column ${idColumn}`);
-            if (!conversationIds || conversationIds.length === 0) {
-                debug.log('No conversation IDs provided, returning empty WHERE clause');
-                return '';
+
+        const buildWhereClause = (tableAlias = '', idColumn = 'conversationId', additionalWhere = '') => {
+            const hasFilters = conversationIds && conversationIds.length > 0;
+            let whereClauses = [];
+
+            if (hasFilters) {
+                const ids = conversationIds.map(id => `'${id}'`).join(',');
+                const prefix = tableAlias ? `${tableAlias}.` : '';
+                whereClauses.push(`${prefix}${idColumn} IN (${ids})`);
             }
-            const prefix = tableAlias ? `${tableAlias}.` : '';
-            const ids = conversationIds.map(id => `'${id}'`).join(',');
-            const whereClause = `WHERE ${prefix}${idColumn} IN (${ids})`;
-            debug.log(`Generated WHERE clause: ${whereClause}`);
-            return whereClause;
+
+            if (additionalWhere) {
+                whereClauses.push(additionalWhere);
+            }
+
+            if (whereClauses.length > 0) {
+                return `WHERE ${whereClauses.join(' AND ')}`;
+            }
+
+            return '';
         };
 
         debug.log('Conversation IDs:', conversationIds || 'None provided (will process all conversations)');
 
         debug.log('Building WHERE clauses...');
-        const messagesWhereClause = buildWhereClause();
-        const reactionsWhereClause = buildWhereClause();
-        debug.log('WHERE clauses built');
-        const conversationsWhereClause = buildWhereClause(undefined, 'id');
-        const messagesJoinWhereClause = buildWhereClause('m');
+        const messagesWhereClause = buildWhereClause('messages', 'conversationId', 'sourceServiceId IS NOT NULL');
+        const reactionsWhereClause = buildWhereClause('reactions', 'conversationId', 'fromId IS NOT NULL');
+        const conversationsWhereClause = buildWhereClause('', 'id');
+        const messagesJoinWhereClause = buildWhereClause('m', 'conversationId');
 
         const analytics: AnalyticsData & { userNamesById: Record<string, string> } = {
             all_conversations: [],
+            // ...
             message_counts: { by_day: {}, by_hour: {} },
             top_conversations: [],
-            kpis: { total_messages: 0, total_conversations: 0, avg_messages_per_day: 0 },
+            kpis: { total_messages: 0, total_conversations: 0, avg_messages_per_day: 0, total_members: 0 },
             reactions: { total_reactions: 0, top_emojis: [], top_emojis_by_author: {} },
             awards: {
                 most_messages_sent: { winner: null, count: 0 },
                 most_reactions_given: { winner: null, count: 0 },
                 most_reactions_received: { winner: null, count: 0 },
                 most_mentioned: { winner: null, count: 0 },
-                most_replied_to: { winner: null, count: 0 },
+                most_mentions_made: { winner: null, count: 0 },
                 most_media_sent: { winner: null, count: 0 },
             },
             funniestUsers: [],
             mostShockingUsers: [],
             mostLovedUsers: [],
+            topUsersByMessageCount: [],
+            topUsersByReactionCount: [],
             userNamesById: {},
         };
 
@@ -470,12 +489,26 @@ export async function processDatabase(
         
         // Process conversations
         if (onProgress) onProgress(25, 'Loading conversations...');
-        const conversationsQuery = `SELECT id, name, json_extract(json, '$.messageCount') as messageCount FROM conversations where type != 'private' ORDER BY messageCount DESC`;
+                const conversationsQuery = `
+            SELECT 
+                id, 
+                name, 
+                json_extract(json, '$.messageCount') as messageCount, 
+                CASE
+                    WHEN members IS NULL OR members = '' THEN 0
+                    ELSE (LENGTH(members) - LENGTH(REPLACE(members, ' ', ''))) + 1
+                END as memberCount
+            FROM conversations 
+            WHERE type != 'private' 
+            ORDER BY messageCount DESC
+        `;
         const conversationsResults = db.exec(conversationsQuery);
         if (conversationsResults[0]) {
-            const conversations: Conversation[] = conversationsResults[0].values.map(([id, name]: [string, string]) => ({
+            const conversations: Conversation[] = conversationsResults[0].values.map(([id, name, messageCount, memberCount]: [string, string, number, number]) => ({
                 id,
-                name: analytics.userNamesById[id] || name || 'Unknown',
+                name: analytics.userNamesById[id] || name || 'Unknown Conversation',
+                messageCount: messageCount || 0,
+                memberCount: memberCount || 0,
             }));
             analytics.all_conversations = conversations;
         }
@@ -486,12 +519,14 @@ export async function processDatabase(
         const byHourResults = db.exec(`SELECT strftime('%H', sent_at/1000, 'unixepoch') as hour, COUNT(*) as count FROM messages ${messagesWhereClause} GROUP BY hour ORDER BY hour ASC`);
         const topConvoResults = db.exec(`SELECT COALESCE(c.name, c.profileName, c.e164, c.id) as name, COUNT(m.rowid) as count FROM messages m JOIN conversations c ON m.conversationId = c.id ${messagesJoinWhereClause} GROUP BY name ORDER BY count DESC LIMIT 5`);
         const kpiResults = db.exec(`SELECT (SELECT COUNT(*) FROM messages ${messagesWhereClause}) as total_messages, (SELECT COUNT(*) FROM conversations ${conversationsWhereClause}) as total_conversations`);
-        const reactionResults = db.exec(`SELECT emoji, fromId, COUNT(*) as count FROM reactions ${reactionsWhereClause} GROUP BY emoji, fromId`);
+        const reactionResults = db.exec(`SELECT r.emoji, c.profileFullName, COUNT(*) as count FROM reactions as r JOIN conversations as c on r.fromId = c.id GROUP BY r.emoji, c.profileFullName`);
 
         // Process results
         if (byDayResults[0]) analytics.message_counts.by_day = Object.fromEntries(byDayResults[0].values);
         if (byHourResults[0]) analytics.message_counts.by_hour = Object.fromEntries(byHourResults[0].values);
-        if (topConvoResults[0]) analytics.top_conversations = topConvoResults[0].values.map(([name, count]: [string, number]) => ({ name, count }));
+                if (topConvoResults[0]) analytics.top_conversations = topConvoResults[0].values.map(([name, count]: [string, number]) => ({ name, count }));
+
+        const total_members = analytics.all_conversations.reduce((sum, convo) => sum + (convo.memberCount || 0), 0);
         
         if (kpiResults[0]) {
             const [total_messages, total_conversations] = kpiResults[0].values[0] as [number, number];
@@ -499,6 +534,7 @@ export async function processDatabase(
                 total_messages,
                 total_conversations,
                 avg_messages_per_day: Object.keys(analytics.message_counts.by_day).length ? Math.round(total_messages / Object.keys(analytics.message_counts.by_day).length) : 0,
+                total_members: total_members,
             };
         }
 
@@ -520,12 +556,12 @@ export async function processDatabase(
         if (onProgress) onProgress(80, 'Generating awards...');
         // Process Award Results
         const awardQueries = {
-            most_messages_sent: `SELECT sourceServiceId, COUNT(*) as count FROM messages ${messagesWhereClause ? `${messagesWhereClause} AND` : 'WHERE'} sourceServiceId IS NOT NULL GROUP BY sourceServiceId ORDER BY count DESC LIMIT 1`,
-            most_reactions_given: `SELECT fromId, COUNT(*) as count FROM reactions ${reactionsWhereClause ? `${reactionsWhereClause} AND` : 'WHERE'} fromId IS NOT NULL GROUP BY fromId ORDER BY count DESC LIMIT 1`,
-            most_reactions_received: `SELECT targetAuthorAci, COUNT(*) as count FROM reactions ${reactionsWhereClause ? `${reactionsWhereClause} AND` : 'WHERE'} targetAuthorAci IS NOT NULL GROUP BY targetAuthorAci ORDER BY count DESC LIMIT 1`,
-            most_mentioned: `SELECT mn.mentionAci, COUNT(*) as count FROM mentions mn JOIN messages m ON mn.messageId = m.id JOIN conversations c ON mn.mentionAci = c.serviceId ${messagesJoinWhereClause} ${messagesJoinWhereClause ? 'AND' : 'WHERE'} mn.mentionAci IS NOT NULL GROUP BY mn.mentionAci ORDER BY count DESC LIMIT 1`,
-            most_replied_to: `SELECT json_extract(m.json, '$.quote.author') as repliedToAuthor, COUNT(*) as count FROM messages m ${messagesJoinWhereClause} ${messagesJoinWhereClause ? 'AND' : 'WHERE'} json_extract(m.json, '$.quote.author') IS NOT NULL GROUP BY repliedToAuthor ORDER BY count DESC LIMIT 1`,
-            most_media_sent: `SELECT sourceServiceId, COUNT(*) as count FROM messages ${messagesWhereClause ? `${messagesWhereClause} AND` : 'WHERE'} hasAttachments = 1 AND sourceServiceId IS NOT NULL GROUP BY sourceServiceId ORDER BY count DESC LIMIT 1`
+            most_messages_sent: `SELECT sourceServiceId, COUNT(*) as count FROM messages ${buildWhereClause('messages', 'conversationId', 'sourceServiceId IS NOT NULL')} GROUP BY sourceServiceId ORDER BY count DESC LIMIT 1`,
+            most_reactions_given: `SELECT fromId, COUNT(*) as count FROM reactions ${buildWhereClause('reactions', 'conversationId', 'fromId IS NOT NULL')} GROUP BY fromId ORDER BY count DESC LIMIT 1`,
+            most_reactions_received: `SELECT targetAuthorAci, COUNT(*) as count FROM reactions ${buildWhereClause('reactions', 'conversationId', 'targetAuthorAci IS NOT NULL')} GROUP BY targetAuthorAci ORDER BY count DESC LIMIT 1`,
+            most_mentioned: `SELECT mn.mentionAci, COUNT(*) as count FROM mentions mn JOIN messages m ON mn.messageId = m.id ${buildWhereClause('m', 'conversationId', 'mn.mentionAci IS NOT NULL')} GROUP BY mn.mentionAci ORDER BY count DESC LIMIT 1`,
+            most_mentions_made: `SELECT m.sourceServiceId, COUNT(mn.mentionAci) as count FROM mentions mn JOIN messages m ON mn.messageId = m.id ${buildWhereClause('m', 'conversationId', 'm.sourceServiceId IS NOT NULL')} GROUP BY m.sourceServiceId ORDER BY count DESC LIMIT 1`,
+            most_media_sent: `SELECT sourceServiceId, COUNT(*) as count FROM messages ${buildWhereClause('messages', 'conversationId', 'hasAttachments = 1 AND sourceServiceId IS NOT NULL')} GROUP BY sourceServiceId ORDER BY count DESC LIMIT 1`
         };
 
         interface AwardResult {
@@ -553,11 +589,118 @@ export async function processDatabase(
         if (onProgress) onProgress(90, 'Finalizing analysis...');
         debug.log('Analytics data generated successfully');
         if (onProgress) onProgress(100, 'Analysis complete!');
+
+        // Calculate emotion-based user rankings
+        if (onProgress) onProgress(95, 'Calculating emotion rankings...');
+        const emotionRankings = calculateEmotionRankings(db, analytics.userNamesById, buildWhereClause);
+        analytics.funniestUsers = emotionRankings.funniestUsers;
+        analytics.mostShockingUsers = emotionRankings.mostShockingUsers;
+        analytics.mostLovedUsers = emotionRankings.mostLovedUsers;
+
+        // Calculate Top Users by Message and Reaction Count
+        if (onProgress) onProgress(97, 'Calculating top users...');
+
+        const topUsersByMessageQuery = `
+            SELECT sourceServiceId, COUNT(*) as count
+            FROM messages
+            ${buildWhereClause('messages', 'conversationId', 'sourceServiceId IS NOT NULL')}
+            GROUP BY sourceServiceId
+            ORDER BY count DESC
+            LIMIT 10
+        `;
+        const topUsersByMessageResults = db.exec(topUsersByMessageQuery);
+        if (topUsersByMessageResults[0]) {
+            analytics.topUsersByMessageCount = topUsersByMessageResults[0].values.map(([id, count]: [string, number]) => ({
+                name: analytics.userNamesById[id] || id,
+                count,
+            }));
+        }
+
+        const topUsersByReactionQuery = `
+            SELECT fromId, COUNT(*) as count
+            FROM reactions
+            ${buildWhereClause('reactions', 'conversationId', 'fromId IS NOT NULL')}
+            GROUP BY fromId
+            ORDER BY count DESC
+            LIMIT 10
+        `;
+        const topUsersByReactionResults = db.exec(topUsersByReactionQuery);
+        if (topUsersByReactionResults[0]) {
+            analytics.topUsersByReactionCount = topUsersByReactionResults[0].values.map(([id, count]: [string, number]) => ({
+                name: analytics.userNamesById[id] || id,
+                count,
+            }));
+        }
+
         return analytics;
     } catch (error) {
         console.error('Error processing database:', error);
         throw new Error('Failed to process database');
     }
+}
+
+function calculateEmotionRankings(db: any, userNamesById: Record<string, string>, buildWhereClause: (tableAlias?: string, idColumn?: string) => string) {
+    const laughEmojis = ['😂', '🤣'];
+    const shockEmojis = ['😮', '🤯', '😱'];
+    const loveEmojis = ['❤️', '😍', '🥰'];
+
+    // Get total message counts for all users to calculate rates
+    const messagesWhereClause = buildWhereClause('m', 'conversationId');
+    const messageCountsQuery = `
+        SELECT
+            m.sourceServiceId as authorId,
+            COUNT(m.id) as messageCount
+        FROM messages m
+        WHERE m.sourceServiceId IS NOT NULL
+        GROUP BY authorId;
+    `;
+    const messageCountsResults = db.exec(messageCountsQuery);
+    const messageCountsByAuthor: Record<string, number> = {};
+    if (messageCountsResults[0] && messageCountsResults[0].values) {
+        messageCountsResults[0].values.forEach(([authorId, count]: [string, number]) => {
+            if (authorId) {
+                messageCountsByAuthor[authorId] = count;
+            }
+        });
+    }
+
+    const getRanking = (emojis: string[]): EmotionUserData[] => {
+        const emojiList = emojis.map(e => `'${e}'`).join(',');
+        const reactionsWhereClause = buildWhereClause('r', 'conversationId');
+
+        const query = `
+            SELECT
+                r.targetAuthorAci as recipientId,
+                COUNT(r.emoji) as reactionCount
+            FROM reactions r
+            ${reactionsWhereClause}
+            ${reactionsWhereClause ? 'AND' : 'WHERE'} r.emoji IN (${emojiList})
+            GROUP BY recipientId
+            ORDER BY reactionCount DESC;
+        `;
+
+        const results = db.exec(query);
+        if (!results[0] || !results[0].values) {
+            return [];
+        }
+
+        return results[0].values.map(([recipientId, totalReacts]: [string, number]) => {
+            const messageCount = messageCountsByAuthor[recipientId] || 1; // Default to 1 to avoid division by zero
+            const rate = totalReacts / messageCount;
+            return {
+                name: userNamesById[recipientId] || recipientId,
+                totalReacts,
+                rate: rate,
+                score: rate * Math.log10(messageCount + 1) // Use a logarithmic scale to balance the score
+            };
+        }).sort((a: { score: number }, b: { score: number }) => b.score - a.score);
+    };
+
+    return {
+        funniestUsers: getRanking(laughEmojis),
+        mostShockingUsers: getRanking(shockEmojis),
+        mostLovedUsers: getRanking(loveEmojis),
+    };
 }
 
 export interface User {
