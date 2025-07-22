@@ -73,6 +73,9 @@ export interface Conversation {
     name: string;
     summary?: string;
     memberCount?: number;
+    messageCount?: number;
+    active_at?: string | null;
+    avgMessagesPerDay?: number;
 }
 
 export interface Award {
@@ -487,12 +490,14 @@ export async function processDatabase(
             });
         }
         
-        // Process conversations
-        if (onProgress) onProgress(25, 'Loading conversations...');
-                const conversationsQuery = `
+        // Process group conversations
+        if (onProgress) onProgress(25, 'Loading group conversations...');
+        const groupConversationsQuery = `
             SELECT 
                 id, 
-                name, 
+                name,
+                type,
+                active_at,
                 json_extract(json, '$.messageCount') as messageCount, 
                 CASE
                     WHEN members IS NULL OR members = '' THEN 0
@@ -502,16 +507,69 @@ export async function processDatabase(
             WHERE type != 'private' 
             ORDER BY messageCount DESC
         `;
-        const conversationsResults = db.exec(conversationsQuery);
-        if (conversationsResults[0]) {
-            const conversations: Conversation[] = conversationsResults[0].values.map(([id, name, messageCount, memberCount]: [string, string, number, number]) => ({
-                id,
-                name: analytics.userNamesById[id] || name || 'Unknown Conversation',
-                messageCount: messageCount || 0,
-                memberCount: memberCount || 0,
-            }));
-            analytics.all_conversations = conversations;
+        const groupConversationsResults = db.exec(groupConversationsQuery);
+        let groupConversations: Conversation[] = [];
+        if (groupConversationsResults[0]) {
+            groupConversations = groupConversationsResults[0].values.map(([id, name, type, active_at, messageCount, memberCount]: [string, string, string, string, number, number]) => {
+                // Calculate days active
+                let daysActive = 1;
+                if (active_at) {
+                    const start = new Date(active_at);
+                    const now = new Date();
+                    const diff = (now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24);
+                    daysActive = Math.max(1, Math.round(diff));
+                }
+                return {
+                    id,
+                    name: analytics.userNamesById[id] || name || 'Unknown Conversation',
+                    type,
+                    active_at,
+                    messageCount: messageCount || 0,
+                    memberCount: memberCount || 0,
+                    avgMessagesPerDay: messageCount && daysActive ? Math.round(messageCount / daysActive) : 0
+                };
+            });
         }
+
+        // Process private conversations with active_at not null
+        const privateConversationsQuery = `
+            SELECT 
+                id, 
+                name,
+                type,
+                active_at,
+                json_extract(json, '$.messageCount') as messageCount, 
+                NULL as memberCount, -- 1:1s
+                active_at
+            FROM conversations 
+            WHERE type = 'private' AND active_at IS NOT NULL
+            ORDER BY messageCount DESC
+        `;
+        const privateConversationsResults = db.exec(privateConversationsQuery);
+        let privateConversations: Conversation[] = [];
+        if (privateConversationsResults[0]) {
+            privateConversations = privateConversationsResults[0].values.map(([id, name, type, active_at, messageCount, memberCount]: [string, string, string, string, number, number]) => {
+                // Calculate days active
+                let daysActive = 1;
+                if (active_at) {
+                    const start = new Date(active_at);
+                    const now = new Date();
+                    const diff = (now.getTime() - start.getTime()) / (1000 * 60 * 60 * 24);
+                    daysActive = Math.max(1, Math.round(diff));
+                }
+                return {
+                    id,
+                    name: analytics.userNamesById[id] || name || 'Unknown Conversation',
+                    type,
+                    active_at,
+                    messageCount: messageCount || 0,
+                    memberCount: memberCount || 0,
+                    avgMessagesPerDay: messageCount && daysActive ? Math.round(messageCount / daysActive) : 0
+                };
+            });
+        }
+
+        analytics.all_conversations = [...groupConversations, ...privateConversations];
 
         // Standard Analytics Queries
         if (onProgress) onProgress(30, 'Analyzing message patterns...');

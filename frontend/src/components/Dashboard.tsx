@@ -451,6 +451,9 @@ const Dashboard: React.FC<DashboardProps> = ({
       <Typography variant="h4" gutterBottom>
         Group Chats
       </Typography>
+      <Typography variant="body1" sx={{ mb: 3 }}>
+        Select a group chat to view its metrics.
+      </Typography>
 
       {analyticsData.all_conversations && (
         <Box sx={{ mb: 4 }}>
