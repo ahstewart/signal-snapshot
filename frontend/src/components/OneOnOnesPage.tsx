@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { Box, Typography, Paper, CircularProgress, Alert, Grid, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
 import { Autocomplete, TextField } from '@mui/material';
 import { AnalyticsData, User, Conversation } from '../utils/database';
-import UserStatsComparison from './UserStatsComparison';
+import { UserStatsComparison } from './UserStatsComparison';
 
 interface OneOnOnesPageProps {
     data: AnalyticsData | null;

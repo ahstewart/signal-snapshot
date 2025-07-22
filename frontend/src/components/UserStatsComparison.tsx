@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Grid, Paper, Typography, CircularProgress, Alert, Divider } from '@mui/material';
 import { loadIndividualStats, User, Conversation, IndividualStatsData } from '../utils/database';
+export {};
 
 interface UserStatsComparisonProps {
   conversation: Conversation;
@@ -48,7 +49,7 @@ async function getParticipants(conversation: Conversation, users: User[], dbBuff
   return users.slice(0, 2);
 }
 
-const UserStatsComparison: React.FC<UserStatsComparisonProps> = ({ conversation, users, dbBuffer, dbKey }) => {
+export const UserStatsComparison: React.FC<UserStatsComparisonProps> = ({ conversation, users, dbBuffer, dbKey }) => {
   const [stats, setStats] = useState<(IndividualStatsData | null)[]>([null, null]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -165,29 +166,99 @@ const UserStatsComparison: React.FC<UserStatsComparisonProps> = ({ conversation,
   }
 
   return (
-    <Grid container spacing={2}>
-      {participants.map((user, idx) => (
-        <Grid item xs={12} md={6} key={user.id}>
-          <Paper sx={{ p: 2, minHeight: 260 }}>
-            <Typography variant="h6" align="center" gutterBottom>
-              {user.name}
-            </Typography>
-            <Divider sx={{ mb: 2 }} />
-            {stats[idx] ? (
-              <Box>
-                <Typography variant="body1"><b>Total Messages Sent:</b> {stats[idx]?.totalMessagesSent ?? 'N/A'}</Typography>
-                <Typography variant="body1"><b>Total Reactions Sent:</b> {stats[idx]?.totalReactionsSent ?? 'N/A'}</Typography>
-                <Typography variant="body1"><b>Unique Reactions Used:</b> {stats[idx]?.mostPopularMessage?.reactions ? [...new Set(stats[idx]!.mostPopularMessage!.reactions.map(r => r.emoji))].join(', ') : 'N/A'}</Typography>
-                <Typography variant="body1"><b>Most Common Reaction:</b> {stats[idx]?.reactedToMost ? `${stats[idx]!.reactedToMost!.emoji} (${stats[idx]!.reactedToMost!.count})` : 'N/A'}</Typography>
-              </Box>
-            ) : (
-              <Typography color="text.secondary">No stats available.</Typography>
-            )}
-          </Paper>
-        </Grid>
-      ))}
-    </Grid>
+    <>
+      <Grid container spacing={2}>
+        {participants.map((user, idx) => (
+          <Grid item xs={12} md={6} key={user.id}>
+            <Paper sx={{ p: 2, minHeight: 260 }}>
+              <Typography variant="h6" align="center" gutterBottom>
+                {user.name}
+              </Typography>
+              <Divider sx={{ mb: 2 }} />
+              {stats[idx] ? (
+                <Box>
+                  <Typography variant="body1"><b>Total Messages Sent:</b> {stats[idx]?.totalMessagesSent ?? 'N/A'}</Typography>
+                  <Typography variant="body1"><b>Total Reactions Sent:</b> {stats[idx]?.totalReactionsSent ?? 'N/A'}</Typography>
+                  <Typography variant="body1"><b>Unique Reactions Used:</b> {stats[idx]?.mostPopularMessage?.reactions ? [...new Set(stats[idx]!.mostPopularMessage!.reactions.map(r => r.emoji))].join(', ') : 'N/A'}</Typography>
+                  <Typography variant="body1"><b>Most Common Reaction:</b> {stats[idx]?.reactedToMost ? `${stats[idx]!.reactedToMost!.emoji} (${stats[idx]!.reactedToMost!.count})` : 'N/A'}</Typography>
+                </Box>
+              ) : (
+                <Typography color="text.secondary">No stats available.</Typography>
+              )}
+            </Paper>
+          </Grid>
+        ))}
+      </Grid>
+      {/* Donut Chart for message comparison */}
+      <Box sx={{ mt: 4, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+        <Typography variant="h6" gutterBottom>Messages Sent Comparison</Typography>
+        <DonutChart
+          labels={participants.map(u => u.name)}
+          values={stats.map(s => s?.totalMessagesSent ?? 0)}
+          colors={["#1976d2", "#d32f2f"]}
+        />
+      </Box>
+    </>
   );
 };
 
-export default UserStatsComparison;
+// Simple DonutChart component using SVG
+interface DonutChartProps {
+  labels: string[];
+  values: number[];
+  colors: string[];
+}
+const DonutChart: React.FC<DonutChartProps> = ({ labels, values, colors }) => {
+  const total = values.reduce((a, b) => a + b, 0);
+  const radius = 48;
+  const stroke = 24;
+  const size = (radius + stroke) * 2;
+  let startAngle = 0;
+  const segments = values.map((val, i) => {
+    const angle = total > 0 ? (val / total) * 360 : 0;
+    const x1 = radius + stroke + radius * Math.cos((Math.PI * (startAngle - 90)) / 180);
+    const y1 = radius + stroke + radius * Math.sin((Math.PI * (startAngle - 90)) / 180);
+    const x2 = radius + stroke + radius * Math.cos((Math.PI * (startAngle + angle - 90)) / 180);
+    const y2 = radius + stroke + radius * Math.sin((Math.PI * (startAngle + angle - 90)) / 180);
+    const largeArc = angle > 180 ? 1 : 0;
+    const path = `M${x1},${y1} A${radius},${radius} 0 ${largeArc},1 ${x2},${y2}`;
+    const segment = (
+      <path
+        key={i}
+        d={path}
+        fill="none"
+        stroke={colors[i % colors.length]}
+        strokeWidth={stroke}
+        strokeLinecap="round"
+        strokeDasharray={`${(angle / 360) * (2 * Math.PI * radius)} ${(2 * Math.PI * radius)}`}
+        strokeDashoffset={-((startAngle / 360) * (2 * Math.PI * radius))}
+      />
+    );
+    startAngle += angle;
+    return segment;
+  });
+  return (
+    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        <circle
+          cx={radius + stroke}
+          cy={radius + stroke}
+          r={radius}
+          fill="#eee"
+          stroke="#fff"
+          strokeWidth={stroke}
+        />
+        {segments}
+      </svg>
+      <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
+        {labels.map((label, i) => (
+          <Box key={label} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box sx={{ width: 16, height: 16, borderRadius: '50%', backgroundColor: colors[i % colors.length] }} />
+            <Typography variant="body2">{label} ({values[i]})</Typography>
+          </Box>
+        ))}
+      </Box>
+    </Box>
+  );
+};
+
