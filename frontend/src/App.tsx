@@ -21,7 +21,7 @@ import {
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import PersonIcon from '@mui/icons-material/Person';
 import SummarizeIcon from '@mui/icons-material/Summarize';
-import ChatIcon from '@mui/icons-material/Chat'; // Add this import
+import ChatIcon from '@mui/icons-material/Chat';
 import ProgressDialog from './components/ProgressDialog';
 import Dashboard from './components/Dashboard';
 import IndividualStats from './components/IndividualStats';
@@ -365,7 +365,7 @@ function App() {
                             <ListItemIcon>
                                 <ChatIcon />
                             </ListItemIcon>
-                            <ListItemText primary="One-on-Ones" />
+                            <ListItemText primary="1:1s" />
                         </ListItemButton>
                     </ListItem>
                     <ListItem disablePadding>
