@@ -29,6 +29,7 @@ import SummaryPage from './components/SummaryPage';
 import OneOnOnesPage from './components/OneOnOnesPage'; // Add this import
 import './App.css';
 import { AnalyticsData, IndividualStatsData, loadDatabase, loadIndividualStats, loadUsers, User } from './utils/database';
+import { exportDashboardToHtml } from './utils/export';
 
 function App() {
     // Shared state
@@ -97,6 +98,12 @@ function App() {
             setShowProgress(false);
         }
     };
+
+    const handleExport = () => {
+        if (analyticsData) {
+            exportDashboardToHtml(analyticsData);
+        }
+      };
 
     // Effect 1: Load initial, unfiltered data and users when a file is ready
     useEffect(() => {
@@ -245,6 +252,10 @@ function App() {
                         Signal Snapshot
                     </Typography>
                     
+                    <Button variant="contained" onClick={handleExport} disabled={!analyticsData}>
+                        Export Interactive HTML
+                    </Button>
+
                     {/* Spacer to push the database info and button to the right */}
                     <Box sx={{ flexGrow: 1 }} />
                     
