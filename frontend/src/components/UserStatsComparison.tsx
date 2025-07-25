@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Box, Grid, Paper, Typography, CircularProgress, Alert, Divider } from '@mui/material';
 import { loadIndividualStats, User, Conversation, IndividualStatsData } from '../utils/database';
-export {};
+import { Doughnut } from 'react-chartjs-2';
+import { Chart, ArcElement, Tooltip, Legend } from 'chart.js';
+Chart.register(ArcElement, Tooltip, Legend);
 
 interface UserStatsComparisonProps {
   conversation: Conversation;
@@ -241,54 +243,47 @@ interface DonutChartProps {
   colors: string[];
 }
 const DonutChart: React.FC<DonutChartProps> = ({ labels, values, colors }) => {
-  const total = values.reduce((a, b) => a + b, 0);
-  const radius = 48;
-  const stroke = 24;
-  const size = (radius + stroke) * 2;
-  let startAngle = 0;
-  const segments = values.map((val, i) => {
-    const angle = total > 0 ? (val / total) * 360 : 0;
-    const x1 = radius + stroke + radius * Math.cos((Math.PI * (startAngle - 90)) / 180);
-    const y1 = radius + stroke + radius * Math.sin((Math.PI * (startAngle - 90)) / 180);
-    const x2 = radius + stroke + radius * Math.cos((Math.PI * (startAngle + angle - 90)) / 180);
-    const y2 = radius + stroke + radius * Math.sin((Math.PI * (startAngle + angle - 90)) / 180);
-    const largeArc = angle > 180 ? 1 : 0;
-    const path = `M${x1},${y1} A${radius},${radius} 0 ${largeArc},1 ${x2},${y2}`;
-    const segment = (
-      <path
-        key={i}
-        d={path}
-        fill="none"
-        stroke={colors[i % colors.length]}
-        strokeWidth={stroke}
-        strokeLinecap="round"
-        strokeDasharray={`${(angle / 360) * (2 * Math.PI * radius)} ${(2 * Math.PI * radius)}`}
-        strokeDashoffset={-((startAngle / 360) * (2 * Math.PI * radius))}
-      />
-    );
-    startAngle += angle;
-    return segment;
-  });
+  const data = {
+    labels,
+    datasets: [
+      {
+        data: values,
+        backgroundColor: colors,
+        borderColor: '#fff',
+        borderWidth: 2,
+      },
+    ],
+  };
+  const options = {
+    cutout: '70%',
+    plugins: {
+      legend: {
+        display: false
+      },
+      tooltip: {
+        callbacks: {
+          label: function(context: any) {
+            const label = context.label || '';
+            const value = context.raw || 0;
+            return `${label}: ${value}`;
+          }
+        }
+      }
+    }
+  };
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
-        <circle
-          cx={radius + stroke}
-          cy={radius + stroke}
-          r={radius}
-          fill="#eee"
-          stroke="#fff"
-          strokeWidth={stroke}
-        />
-        {segments}
-      </svg>
+      <Doughnut data={data} options={options} style={{ maxWidth: 200, maxHeight: 200 }} />
       <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
-        {labels.map((label, i) => (
-          <Box key={label} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Box sx={{ width: 16, height: 16, borderRadius: '50%', backgroundColor: colors[i % colors.length] }} />
-            <Typography variant="body2">{label} ({values[i]})</Typography>
-          </Box>
-        ))}
+        {[...labels].map((_, idx, arr) => {
+          const i = arr.length - 1 - idx;
+          return (
+            <Box key={labels[i]} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Box sx={{ width: 16, height: 16, borderRadius: '50%', backgroundColor: colors[i % colors.length] }} />
+              <Typography variant="body2">{labels[i]} ({values[i]})</Typography>
+            </Box>
+          );
+        })}
       </Box>
     </Box>
   );
