@@ -22,10 +22,15 @@ async function getParticipants(conversation: Conversation, users: User[], dbBuff
       const db = new sqlJs.Database(new Uint8Array(dbBuffer));
       const query = `SELECT id, profileFullName, profileName FROM conversations WHERE json_extract(json, '$.verified') = 1 LIMIT 1`;
       const res = db.exec(query);
+      console.debug(`[UserStatsComparison] Participants query results: ${JSON.stringify(res)}`);
       if (res[0] && res[0].values && res[0].values.length > 0) {
         const [id, profileFullName, profileName] = res[0].values[0];
         const name = (profileFullName || profileName || '').trim();
         verifiedUser = users.find(u => u.id === id || u.name === name);
+        if (verifiedUser) {
+          verifiedUser.fromId = id;
+        }
+        console.debug(`[UserStatsComparison] Found verified user: sourceServiceId = ${verifiedUser?.id}, name = ${verifiedUser?.name}, fromId=${verifiedUser?.fromId}`)
       }
       db.close();
     } catch (err) {
@@ -36,6 +41,7 @@ async function getParticipants(conversation: Conversation, users: User[], dbBuff
   const nameMatches = users.filter(
     u => u.name === conversation.name || (u as any).profileFullName === conversation.name
   );
+  console.debug(`[UserStatsComparison] nameMatches: ${JSON.stringify(nameMatches)}`);
   let firstUser = nameMatches[0] || users[0];
   // If verifiedUser is found and not the same as firstUser, use as second participant
   if (verifiedUser && verifiedUser.id !== firstUser.id) {
@@ -60,6 +66,7 @@ export const UserStatsComparison: React.FC<UserStatsComparisonProps> = ({ conver
     let cancelled = false;
     (async () => {
       const found = await getParticipants(conversation, users, dbBuffer);
+      console.log('[UserStatsComparison] Participants loaded:', found);
       if (!cancelled) setParticipants(found);
     })();
     return () => { cancelled = true; };
@@ -71,39 +78,62 @@ export const UserStatsComparison: React.FC<UserStatsComparisonProps> = ({ conver
     async function fetchStatsForConversation() {
       setLoading(true);
       setError(null);
-      async function getStatsForUser(userId: string, convoId: string): Promise<IndividualStatsData | null> {
+      async function getStatsForUser(userId: string, convoId: string, fromId: string): Promise<IndividualStatsData | null> {
+        console.log(`[UserStatsComparison] getStatsForUser: userId=`, userId, 'fromId=', fromId);
         if (!dbBuffer) return null;
         try {
           const sqlJs = await (await import('../utils/database')).getSqlJs();
           const db = new sqlJs.Database(new Uint8Array(dbBuffer));
-          // For 1:1 Signal, messages.conversationId is the OTHER participant's user id
-          const otherUser = participants.find(p => p.id !== userId);
-          const convoIdToQuery = otherUser ? otherUser.id : convoId;
+          // For 1:1 Signal, use the conversation.id as the conversationId in all queries
+          const convoIdToQuery = convoId;
+
+          console.debug(`[UserStatsComparison] Querying total messages for userId=${userId}, convoIdToQuery=${convoIdToQuery}`);
           // Total messages sent by user in this 1:1
           const msgCountQuery = `SELECT COUNT(*) FROM messages WHERE sourceServiceId = '${userId}' AND conversationId = '${convoIdToQuery}'`;
           const msgCountResult = db.exec(msgCountQuery);
+          console.debug(`[UserStatsComparison] totalMessagesSent result:`, msgCountResult);
           const totalMessagesSent = msgCountResult[0]?.values[0]?.[0] ?? 0;
+          console.debug(`[UserStatsComparison] totalMessagesSent:`, totalMessagesSent);
+
+          console.debug(`[UserStatsComparison] Querying total reactions for userId=${userId}, convoIdToQuery=${convoIdToQuery}`);
           // Total reactions sent by user in this 1:1
-          const reactCountQuery = `SELECT COUNT(*) FROM reactions WHERE authorId = '${userId}' AND conversationId = '${convoIdToQuery}'`;
+          const reactCountQuery = `SELECT COUNT(*) FROM reactions WHERE fromId = '${fromId}' AND conversationId = '${convoIdToQuery}'`;
           const reactCountResult = db.exec(reactCountQuery);
+          console.debug(`[UserStatsComparison] totalReactionsSent result:`, reactCountResult);
           const totalReactionsSent = reactCountResult[0]?.values[0]?.[0] ?? 0;
+          console.debug(`[UserStatsComparison] totalReactionsSent:`, totalReactionsSent);
+
+          console.debug(`[UserStatsComparison] Querying most common reaction for userId=${userId}, convoIdToQuery=${convoIdToQuery}`);
           // Most common reaction sent by user in this 1:1
-          const topReactionQuery = `SELECT emoji, COUNT(*) as count FROM reactions WHERE authorId = '${userId}' AND conversationId = '${convoIdToQuery}' GROUP BY emoji ORDER BY count DESC LIMIT 1`;
+          const topReactionQuery = `SELECT emoji, COUNT(*) as count FROM reactions WHERE fromId = '${fromId}' AND conversationId = '${convoIdToQuery}' GROUP BY emoji ORDER BY count DESC LIMIT 1`;
           const topReactionResult = db.exec(topReactionQuery);
+          console.debug(`[UserStatsComparison] reactedToMost result:`, topReactionResult);
           const reactedToMost = topReactionResult[0]?.values[0] ? {
             emoji: topReactionResult[0].values[0][0],
             count: topReactionResult[0].values[0][1],
             name: ''
           } : null;
+
+          console.debug(`[UserStatsComparison] Querying set of unique reactions for userId=${userId}, convoIdToQuery=${convoIdToQuery}`);
+          // Unique reactions sent by user in this 1:1
+          const uniqueReactionsQuery = `SELECT DISTINCT emoji FROM reactions WHERE fromId = '${fromId}' AND conversationId = '${convoIdToQuery}'`;
+          const uniqueReactionsResult = db.exec(uniqueReactionsQuery);
+          console.debug(`[UserStatsComparison] uniqueReactionsResult result:`, uniqueReactionsResult);
+          const uniqueReactions = uniqueReactionsResult[0]?.values.map(([emoji]: [string]) => emoji) || [];
+          console.debug(`[UserStatsComparison] uniqueReactions:`, uniqueReactions);
+
+          console.debug(`[UserStatsComparison] Querying most popular message for userId=${userId}, convoIdToQuery=${convoIdToQuery}`);
           // Most popular message sent by user in this 1:1
           const popMsgQuery = `SELECT id, body FROM messages WHERE sourceServiceId = '${userId}' AND conversationId = '${convoIdToQuery}' ORDER BY (SELECT COUNT(*) FROM reactions WHERE messageId = messages.id) DESC LIMIT 1`;
           const popMsgResult = db.exec(popMsgQuery);
+          console.debug(`[UserStatsComparison] mostPopularMessage result:`, popMsgResult);
           let mostPopularMessage = null;
           if (popMsgResult[0] && popMsgResult[0].values[0]) {
             const [msgId, text] = popMsgResult[0].values[0];
             // Get all reactions for this message
-            const reactionsQuery = `SELECT emoji, authorId FROM reactions WHERE messageId = '${msgId}'`;
+            const reactionsQuery = `SELECT emoji, fromId FROM reactions WHERE messageId = '${msgId}'`;
             const reactionsResult = db.exec(reactionsQuery);
+            console.debug(`[UserStatsComparison] reactions result:`, reactionsResult);
             const reactions = reactionsResult[0]?.values.map(([emoji, sender]: [string, string]) => ({ emoji, sender })) || [];
             mostPopularMessage = {
               text: text ?? '',
@@ -118,15 +148,17 @@ export const UserStatsComparison: React.FC<UserStatsComparisonProps> = ({ conver
             totalReactionsSent,
             reactedToMost,
             receivedMostReactionsFrom: null, // Not implemented per-conversation for now
-            mostPopularMessage
+            mostPopularMessage,
+            uniqueReactions,
           };
         } catch (err) {
+          console.error('[UserStatsComparison] Error in getStatsForUser:', err);
           return null;
         }
       }
       try {
         const results = await Promise.all(
-          participants.map(u => getStatsForUser(u.id, conversation.id))
+          participants.map(u => getStatsForUser(u.id, conversation.id, u.fromId!))
         );
         if (!cancelled) {
           setStats(results);
@@ -179,7 +211,7 @@ export const UserStatsComparison: React.FC<UserStatsComparisonProps> = ({ conver
                 <Box>
                   <Typography variant="body1"><b>Total Messages Sent:</b> {stats[idx]?.totalMessagesSent ?? 'N/A'}</Typography>
                   <Typography variant="body1"><b>Total Reactions Sent:</b> {stats[idx]?.totalReactionsSent ?? 'N/A'}</Typography>
-                  <Typography variant="body1"><b>Unique Reactions Used:</b> {stats[idx]?.mostPopularMessage?.reactions ? [...new Set(stats[idx]!.mostPopularMessage!.reactions.map(r => r.emoji))].join(', ') : 'N/A'}</Typography>
+                  <Typography variant="body1"><b>Unique Reactions Used:</b> {stats[idx]?.uniqueReactions.join(', ') ?? 'N/A'}</Typography>
                   <Typography variant="body1"><b>Most Common Reaction:</b> {stats[idx]?.reactedToMost ? `${stats[idx]!.reactedToMost!.emoji} (${stats[idx]!.reactedToMost!.count})` : 'N/A'}</Typography>
                 </Box>
               ) : (

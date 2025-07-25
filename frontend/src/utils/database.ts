@@ -764,6 +764,7 @@ function calculateEmotionRankings(db: any, userNamesById: Record<string, string>
 export interface User {
     id: string;
     name: string;
+    fromId?: string;
 }
 
 export interface IndividualStatsData {
@@ -788,6 +789,7 @@ export interface IndividualStatsData {
             sender: string;
         }[];
     } | null;
+    uniqueReactions: string[];
 }
 
 export async function getUsers(dbBuffer: ArrayBuffer): Promise<User[]> {
@@ -830,11 +832,28 @@ export async function getUsers(dbBuffer: ArrayBuffer): Promise<User[]> {
         const uniqueUserIds = Array.from(new Set(allUserIds.filter(id => typeof id === 'string' && id)));
 
         // Create the User[] array, using the name map
-        const usersWithPotentialDuplicates: User[] = uniqueUserIds
-            .map(id => ({
-                id,
-                name: nameMap.get(id) || id, // Use mapped name, fallback to ID
-            }));
+        // Build users from the conversations table, mapping id/serviceId to User.id/fromId
+const usersWithPotentialDuplicates: User[] = [];
+if (nameMappingResults[0]) {
+    nameMappingResults[0].values.forEach(([id, serviceId, profileFullName, profileName]: [string, string, string, string]) => {
+        const name = (profileFullName || profileName || '').trim() || serviceId || id;
+        usersWithPotentialDuplicates.push({
+            id: serviceId,      // User.id is sourceServiceId
+            fromId: id,         // User.fromId is the conversation id
+            name
+        });
+    });
+}
+// Add any users from uniqueUserIds not already included by serviceId
+uniqueUserIds.forEach(uid => {
+    if (!usersWithPotentialDuplicates.some(u => u.id === uid)) {
+        usersWithPotentialDuplicates.push({
+            id: uid,
+            fromId: undefined,
+            name: nameMap.get(uid) || uid
+        });
+    }
+});
 
         // Deduplicate users by name, keeping the first occurrence
         const uniqueUsersByName = new Map<string, User>();
@@ -1012,6 +1031,12 @@ export async function getIndividualStats(dbBuffer: ArrayBuffer, userId: string):
             reactedToMost,
             receivedMostReactionsFrom,
             mostPopularMessage,
+            // Collect all unique emoji reactions sent by the user
+            uniqueReactions: (() => {
+                const uniqueEmojiQuery = `SELECT DISTINCT emoji FROM reactions WHERE fromId = '${userUUID}'`;
+                const uniqueEmojiResult = db.exec(uniqueEmojiQuery);
+                return uniqueEmojiResult[0]?.values.map((row: any[]) => row[0]) || [];
+            })()
         };
     } catch (error) {
         console.error(`Error getting stats for user ${userId}:`, error);

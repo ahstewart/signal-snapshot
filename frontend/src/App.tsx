@@ -122,6 +122,8 @@ function App() {
                     setProgressMessage(m);
                 });
                 setUsers(users);
+        // DEBUG: Log users after loading to verify fromId presence
+        console.log('[App] Users loaded:', users);
                 
                 // Then load the full database
                 setProgressMessage('Loading database...');
