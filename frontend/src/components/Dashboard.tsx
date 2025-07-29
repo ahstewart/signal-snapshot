@@ -159,7 +159,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   function renderKpiCard(title: string, value: string | number) {
     return (
       <Grid item xs={12} sm={4}>
-        <Paper sx={{ p: 2, textAlign: 'center' }}>
+        <Paper sx={{ p: 2, textAlign: 'center', background: 'linear-gradient(135deg, #f4f7fa 70%, #e3ecf7 100%)', boxShadow: 3, borderRadius: 3, border: '1px solid #d6e0ef' }}>
           <Typography variant="h4" component="div">{value}</Typography>
           <Typography variant="body1" color="text.secondary">{title}</Typography>
         </Paper>

@@ -16,8 +16,11 @@ import {
     CircularProgress, 
     Alert,
     LinearProgress,
-    Divider
+    Divider,
+    ThemeProvider,
+    CssBaseline
 } from '@mui/material';
+import { theme } from './theme/theme';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import PersonIcon from '@mui/icons-material/Person';
 import SummarizeIcon from '@mui/icons-material/Summarize';
@@ -244,13 +247,15 @@ function App() {
     const drawerWidth = 240;
 
     return (
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
         <Box sx={{ display: 'flex', minHeight: '100vh' }}>
             {progressDialog}
             
             {/* App Bar */}
             <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
                 <Toolbar>
-                    <Typography variant="h6" component="div" sx={{ fontWeight: 'bold', mr: 3 }}>
+                    <Typography variant="h6" component="div" sx={{ fontWeight: 'bold', mr: 3, color: 'white' }}>
                         Signal Snapshot
                     </Typography>
                     
@@ -380,7 +385,7 @@ function App() {
                             <ListItemIcon>
                                 <PersonIcon />
                             </ListItemIcon>
-                            <ListItemText primary="Individual Stats" />
+                            <ListItemText primary="Individuals" />
                         </ListItemButton>
                     </ListItem>
                 </List>
@@ -481,6 +486,7 @@ function App() {
                 )}
             </Box>
         </Box>
+      </ThemeProvider>
     );
 }
 

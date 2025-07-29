@@ -46,7 +46,7 @@ const SummaryPage: React.FC<SummaryPageProps> = ({ data, loading, error, users }
     // Always use the full analytics data, not filtered by selection
     const renderKpiCard = (title: string, value: string | number) => (
         <Grid item xs={12} sm={4}>
-            <Paper sx={{ p: 2, textAlign: 'center' }}>
+            <Paper sx={{ p: 2, textAlign: 'center', background: 'linear-gradient(135deg, #f4f7fa 70%, #e3ecf7 100%)', boxShadow: 3, borderRadius: 3, border: '1px solid #d6e0ef' }}>
                 <Typography variant="h4" component="div">{value}</Typography>
                 <Typography variant="body1" color="text.secondary">{title}</Typography>
             </Paper>
