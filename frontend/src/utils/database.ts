@@ -577,7 +577,9 @@ export async function processDatabase(
         const byHourResults = db.exec(`SELECT strftime('%H', sent_at/1000, 'unixepoch') as hour, COUNT(*) as count FROM messages ${messagesWhereClause} GROUP BY hour ORDER BY hour ASC`);
         const topConvoResults = db.exec(`SELECT COALESCE(c.name, c.profileName, c.e164, c.id) as name, COUNT(m.rowid) as count FROM messages m JOIN conversations c ON m.conversationId = c.id ${messagesJoinWhereClause} GROUP BY name ORDER BY count DESC LIMIT 5`);
         const kpiResults = db.exec(`SELECT (SELECT COUNT(*) FROM messages ${messagesWhereClause}) as total_messages, (SELECT COUNT(*) FROM conversations ${conversationsWhereClause}) as total_conversations`);
-        const reactionResults = db.exec(`SELECT r.emoji, c.profileFullName, COUNT(*) as count FROM reactions as r JOIN conversations as c on r.fromId = c.id GROUP BY r.emoji, c.profileFullName`);
+        // Use filtered reactions for selected conversations
+        const filteredReactionsWhereClause = buildWhereClause('r', 'conversationId');
+        const reactionResults = db.exec(`SELECT r.emoji, c.profileFullName, COUNT(*) as count FROM reactions as r JOIN conversations as c on r.fromId = c.id ${filteredReactionsWhereClause} GROUP BY r.emoji, c.profileFullName`);
 
         // Process results
         if (byDayResults[0]) analytics.message_counts.by_day = Object.fromEntries(byDayResults[0].values);
@@ -639,7 +641,11 @@ export async function processDatabase(
 
         awardResults.forEach(({ award, result }: AwardResult) => {
             if (result) {
-                const [winner, count] = result;
+                let [winner, count] = result;
+                // Map winner to profileFullName for most_reactions_given
+                if (award === 'most_reactions_given' && analytics.userNamesById[winner]) {
+                    winner = analytics.userNamesById[winner];
+                }
                 (analytics.awards as any)[award] = { winner, count };
             }
         });

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useNavigate, Routes, Route, Link } from 'react-router-dom';
+import { useNavigate, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { 
     AppBar, 
     Box, 
@@ -16,15 +16,12 @@ import {
     CircularProgress, 
     Alert,
     LinearProgress,
-    Divider,
-    ThemeProvider,
-    CssBaseline
+    Divider
 } from '@mui/material';
-import { theme } from './theme/theme';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import PersonIcon from '@mui/icons-material/Person';
 import SummarizeIcon from '@mui/icons-material/Summarize';
-import ChatIcon from '@mui/icons-material/Chat';
+import ChatIcon from '@mui/icons-material/Chat'; // Add this import
 import ProgressDialog from './components/ProgressDialog';
 import Dashboard from './components/Dashboard';
 import IndividualStats from './components/IndividualStats';
@@ -32,7 +29,6 @@ import SummaryPage from './components/SummaryPage';
 import OneOnOnesPage from './components/OneOnOnesPage'; // Add this import
 import './App.css';
 import { AnalyticsData, IndividualStatsData, loadDatabase, loadIndividualStats, loadUsers, User } from './utils/database';
-import { exportDashboardToHtml } from './utils/export';
 
 function App() {
     // Shared state
@@ -61,6 +57,7 @@ function App() {
     const [originalAnalyticsData, setOriginalAnalyticsData] = useState<AnalyticsData | null>(null);
 
     const navigate = useNavigate(); // Add this hook
+    const location = useLocation();
 
     // Handlers
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
@@ -102,12 +99,6 @@ function App() {
         }
     };
 
-    const handleExport = () => {
-        if (analyticsData) {
-            exportDashboardToHtml(analyticsData);
-        }
-      };
-
     // Effect 1: Load initial, unfiltered data and users when a file is ready
     useEffect(() => {
         const loadInitialData = async () => {
@@ -125,8 +116,6 @@ function App() {
                     setProgressMessage(m);
                 });
                 setUsers(users);
-        // DEBUG: Log users after loading to verify fromId presence
-        console.log('[App] Users loaded:', users);
                 
                 // Then load the full database
                 setProgressMessage('Loading database...');
@@ -247,22 +236,16 @@ function App() {
     const drawerWidth = 240;
 
     return (
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
         <Box sx={{ display: 'flex', minHeight: '100vh' }}>
             {progressDialog}
             
             {/* App Bar */}
             <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
                 <Toolbar>
-                    <Typography variant="h6" component="div" sx={{ fontWeight: 'bold', mr: 3, color: 'white' }}>
+                    <Typography variant="h6" component="div" sx={{ fontWeight: 'bold', mr: 3 }}>
                         Signal Snapshot
                     </Typography>
                     
-                    <Button variant="contained" onClick={handleExport} disabled={!analyticsData}>
-                        Export Interactive HTML
-                    </Button>
-
                     {/* Spacer to push the database info and button to the right */}
                     <Box sx={{ flexGrow: 1 }} />
                     
@@ -340,8 +323,9 @@ function App() {
                         <ListItemButton 
                             component={Link} 
                             to="/summary" 
-                            selected={window.location.pathname === '/summary'}
+                            selected={location.pathname === '/summary'}
                             disabled={!dbBuffer}
+                            sx={location.pathname === '/summary' ? { backgroundColor: '#e3ecf7', fontWeight: 600 } : {}}
                         >
                             <ListItemIcon>
                                 <SummarizeIcon />
@@ -353,8 +337,9 @@ function App() {
                         <ListItemButton 
                             component={Link} 
                             to="/" 
-                            selected={window.location.pathname === '/'}
+                            selected={location.pathname === '/'}
                             disabled={!dbBuffer}
+                            sx={location.pathname === '/' ? { backgroundColor: '#e3ecf7', fontWeight: 600 } : {}}
                         >
                             <ListItemIcon>
                                 <DashboardIcon />
@@ -366,26 +351,28 @@ function App() {
                         <ListItemButton 
                             component={Link} 
                             to="/oneonones"
-                            selected={window.location.pathname === '/oneonones'}
+                            selected={location.pathname === '/oneonones'}
                             disabled={!dbBuffer}
+                            sx={location.pathname === '/oneonones' ? { backgroundColor: '#e3ecf7', fontWeight: 600 } : {}}
                         >
                             <ListItemIcon>
                                 <ChatIcon />
                             </ListItemIcon>
-                            <ListItemText primary="1:1s" />
+                            <ListItemText primary="One-on-Ones" />
                         </ListItemButton>
                     </ListItem>
                     <ListItem disablePadding>
                         <ListItemButton 
                             component={Link} 
                             to="/individual" 
-                            selected={window.location.pathname === '/individual'}
+                            selected={location.pathname === '/individual'}
                             disabled={!dbBuffer}
+                            sx={location.pathname === '/individual' ? { backgroundColor: '#e3ecf7', fontWeight: 600 } : {}}
                         >
                             <ListItemIcon>
                                 <PersonIcon />
                             </ListItemIcon>
-                            <ListItemText primary="Individuals" />
+                            <ListItemText primary="Individual Stats" />
                         </ListItemButton>
                     </ListItem>
                 </List>
@@ -464,8 +451,6 @@ function App() {
                                     loading={loading}
                                     error={error}
                                     users={users}
-                                    dbBuffer={dbBuffer ?? undefined}
-                                    dbKey={dbKey}
                                 />
                             }
                         />
@@ -486,7 +471,6 @@ function App() {
                 )}
             </Box>
         </Box>
-      </ThemeProvider>
     );
 }
 
