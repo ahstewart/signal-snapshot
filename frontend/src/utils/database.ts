@@ -803,7 +803,6 @@ export async function getUsers(dbBuffer: ArrayBuffer): Promise<User[]> {
         debug('Creating database from buffer...');
         const db = await createDatabaseFromBuffer(dbBuffer);
         const nameMap = new Map<string, string>();
-        
         // Query to get user name mappings from conversations
         const nameMappingQuery = `
             SELECT id, serviceId, profileFullName, profileName
@@ -820,59 +819,52 @@ export async function getUsers(dbBuffer: ArrayBuffer): Promise<User[]> {
                 }
             });
         }
-
         // Collect all unique user IDs from messages and reactions
         const messageSendersQuery = `SELECT DISTINCT sourceServiceId FROM messages WHERE sourceServiceId IS NOT NULL`;
         const messageSendersResult = db.exec(messageSendersQuery);
         const messageSenders = messageSendersResult[0]?.values.map(([id]: [string]) => id) || [];
-
         const reactionGiversQuery = `SELECT DISTINCT fromId FROM reactions WHERE fromId IS NOT NULL`;
         const reactionGiversResult = db.exec(reactionGiversQuery);
         const reactionGivers = reactionGiversResult[0]?.values.map(([id]: [string]) => id) || [];
-
         const reactionReceiversQuery = `SELECT DISTINCT targetAuthorAci FROM reactions WHERE targetAuthorAci IS NOT NULL`;
         const reactionReceiversResult = db.exec(reactionReceiversQuery);
         const reactionReceivers = reactionReceiversResult[0]?.values.map(([id]: [string]) => id) || [];
-
+        // Only keep users whose ID appears in at least one of these tables
         const allUserIds = [...new Set([...messageSenders, ...reactionGivers, ...reactionReceivers])];
-        const uniqueUserIds = Array.from(new Set(allUserIds.filter(id => typeof id === 'string' && id)));
-
-        // Create the User[] array, using the name map
         // Build users from the conversations table, mapping id/serviceId to User.id/fromId
-const usersWithPotentialDuplicates: User[] = [];
-if (nameMappingResults[0]) {
-    nameMappingResults[0].values.forEach(([id, serviceId, profileFullName, profileName]: [string, string, string, string]) => {
-        const name = (profileFullName || profileName || '').trim() || serviceId || id;
-        usersWithPotentialDuplicates.push({
-            id: serviceId,      // User.id is sourceServiceId
-            fromId: id,         // User.fromId is the conversation id
-            name
+        const users: User[] = [];
+        if (nameMappingResults[0]) {
+            nameMappingResults[0].values.forEach(([id, serviceId, profileFullName, profileName]: [string, string, string, string]) => {
+                const name = (profileFullName || profileName || '').trim() || serviceId || id;
+                // Only include if serviceId or id is in allUserIds
+                if (allUserIds.includes(serviceId) || allUserIds.includes(id)) {
+                    users.push({
+                        id: serviceId,
+                        fromId: id,
+                        name
+                    });
+                }
+            });
+        }
+        // Add any users from allUserIds not already included by serviceId
+        allUserIds.forEach(uid => {
+            if (!users.some(u => u.id === uid)) {
+                users.push({
+                    id: uid,
+                    fromId: undefined,
+                    name: nameMap.get(uid) || uid
+                });
+            }
         });
-    });
-}
-// Add any users from uniqueUserIds not already included by serviceId
-uniqueUserIds.forEach(uid => {
-    if (!usersWithPotentialDuplicates.some(u => u.id === uid)) {
-        usersWithPotentialDuplicates.push({
-            id: uid,
-            fromId: undefined,
-            name: nameMap.get(uid) || uid
-        });
-    }
-});
-
         // Deduplicate users by name, keeping the first occurrence
         const uniqueUsersByName = new Map<string, User>();
-        for (const user of usersWithPotentialDuplicates) {
+        for (const user of users) {
             if (!uniqueUsersByName.has(user.name)) {
                 uniqueUsersByName.set(user.name, user);
             }
         }
-
-        const users = Array.from(uniqueUsersByName.values())
+        return Array.from(uniqueUsersByName.values())
             .sort((a, b) => a.name.localeCompare(b.name));
-
-        return users;
     } catch (error) {
         console.error('Error getting users:', error);
         throw new Error('Failed to get users from the database.');

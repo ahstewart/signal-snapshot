@@ -16,6 +16,8 @@ import {
   useTheme,
 } from '@mui/material';
 import { User as DbUser } from '../utils/database';
+import ClearIcon from '@mui/icons-material/Clear';
+import IconButton from '@mui/material/IconButton';
 
 interface User {
   id: string;
@@ -92,10 +94,6 @@ const IndividualStats: React.FC<IndividualStatsProps> = ({
     return <Box sx={{ p: 4, color: 'error.main' }}>Error: {error}</Box>;
   }
 
-  if (!data) {
-    return <Box sx={{ p: 4 }}>No data available</Box>;
-  }
-
   return (
     <Box sx={{ p: 4 }}>
       <Typography variant="h4" gutterBottom>
@@ -118,6 +116,27 @@ const IndividualStats: React.FC<IndividualStatsProps> = ({
               },
             }}
             displayEmpty
+            renderValue={selected => {
+              if (!selected) return <em>Select a user...</em>;
+              const user = users.find(u => u.id === selected);
+              return user ? user.name : <em>Select a user...</em>;
+            }}
+            endAdornment={
+              selectedUser && (
+                <IconButton
+                  aria-label="clear selection"
+                  edge="end"
+                  size="small"
+                  onClick={e => {
+                    e.stopPropagation();
+                    onUserSelect('');
+                  }}
+                  sx={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)' }}
+                >
+                  <ClearIcon fontSize="small" />
+                </IconButton>
+              )
+            }
           >
             <MenuItem value=""><em>Select a user...</em></MenuItem>
             {users.map((user) => (
@@ -129,14 +148,13 @@ const IndividualStats: React.FC<IndividualStatsProps> = ({
         </FormControl>
       )}
 
-      {data && (
+      {/* Only show stats if a user is selected and data is available */}
+      {selectedUser && data && (
         <>
           <Grid container spacing={3}>
             {renderKpiCard('Total Messages Sent', data.totalMessagesSent)}
             {renderKpiCard('Most Popular Day', data.mostPopularDay)}
             {renderKpiCard('Total Reactions Sent', data.totalReactionsSent)}
-
-            
 
             {(data.reactedToMost || data.receivedMostReactionsFrom) && (
               <Grid container spacing={3} justifyContent="center" alignItems="center" sx={{ mt: 2 }}>

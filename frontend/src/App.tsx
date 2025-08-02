@@ -186,11 +186,9 @@ function App() {
     }, [selectedConversationIds, initialDataLoaded, dbBuffer, dbKey]);
 
     // Auto-select first user when users are loaded and no user is selected
+    // Only auto-select if users are loaded AND selectedUser is undefined (not empty string)
     useEffect(() => {
-        if (users.length > 0 && !selectedUser) {
-            console.debug('App: Auto-selecting first user', users[0].id);
-            setSelectedUser(users[0].id);
-        }
+        // Remove auto-select logic to allow empty selection
     }, [users, selectedUser]);
 
     // Effect 3: Load individual stats when user is selected
@@ -231,52 +229,6 @@ function App() {
         
         fetchStats();
     }, [dbBuffer, dbKey, selectedUser]);
-
-    // Filter users in App.tsx when loading so only users with actual stats data are included in the dropdown.
-    useEffect(() => {
-        const filterUsersWithData = async () => {
-            if (!dbBuffer || !initialDataLoaded) return;
-            
-            setLoading(true);
-            setError(null);
-            setShowProgress(true);
-            setProgress(0);
-            setProgressMessage('Filtering users with data...');
-            
-            try {
-                // Filter users to only those with data
-                const filteredUsers: User[] = [];
-                for (const user of users) {
-                    try {
-                        const stats = await loadIndividualStats(dbBuffer, dbKey, user.id);
-                        if (
-                            stats.totalMessagesSent > 0 ||
-                            stats.totalReactionsSent > 0 ||
-                            stats.reactedToMost ||
-                            stats.receivedMostReactionsFrom ||
-                            stats.mostPopularMessage
-                        ) {
-                            filteredUsers.push(user);
-                        }
-                    } catch (e) {
-                        // Ignore users with errors
-                    }
-                }
-                setUsers(filteredUsers);
-                setProgress(100);
-                
-                // Small delay before hiding to prevent flashing
-                setTimeout(() => setShowProgress(false), 500);
-            } catch (err) {
-                setError(`Error filtering users: ${err instanceof Error ? err.message : 'Unknown error'}`);
-                setShowProgress(false);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        filterUsersWithData();
-    }, [dbBuffer, initialDataLoaded]);
 
     // Memoize the progress dialog to prevent unnecessary re-renders
     const progressDialog = useMemo(() => (
