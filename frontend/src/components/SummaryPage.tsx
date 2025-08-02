@@ -59,7 +59,7 @@ const SummaryPage: React.FC<SummaryPageProps> = ({ data, loading, error, users }
                 Summary
             </Typography>
             <Typography variant="body1" sx={{ mb: 3 }}>
-                Welcome to your Signal Snapshot! Use the navigation menu to your left to explore different layers of your Signal ecosystem. The top view is "Group Chats", which are defined as conversations with more than 2 members. Next are "One-on-Ones", which are all chats between you and one other person. Lastly, there is an "Individuals" view, which dives deep into an individual person's Signal usage.
+                Welcome to your Signal Snapshot! Use the navigation menu to your left to explore different layers of your Signal ecosystem. 
             </Typography>
             {loading && (
                 <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 200 }}>

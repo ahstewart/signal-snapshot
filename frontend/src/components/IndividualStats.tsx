@@ -76,30 +76,9 @@ const IndividualStats: React.FC<IndividualStatsProps> = ({
   const renderKpiCard = (title: string, value: string | number) => {
     return (
       <Grid item xs={12} sm={4}>
-        <Paper 
-          sx={{
-            background: muiTheme.palette.background.paper,
-            p: 3,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            justifyContent: 'center',
-            minHeight: '140px',
-            borderRadius: 2,
-            boxShadow: muiTheme.shadows[2],
-            '&:hover': {
-              transform: 'translateY(-4px)',
-              boxShadow: muiTheme.shadows[6]
-            },
-            transition: 'all 0.3s ease-in-out'
-          }}
-        >
-          <Typography variant="h4" component="div" sx={{ fontWeight: 600, mb: 1 }}>
-            {value}
-          </Typography>
-          <Typography variant="body1" color="text.secondary">
-            {title}
-          </Typography>
+        <Paper sx={{ p: 2, textAlign: 'center', background: 'linear-gradient(135deg, #f4f7fa 70%, #e3ecf7 100%)', boxShadow: 3, borderRadius: 3, border: '1px solid #d6e0ef' }}>
+          <Typography variant="h4" component="div">{value}</Typography>
+          <Typography variant="body1" color="text.secondary">{title}</Typography>
         </Paper>
       </Grid>
     );
@@ -138,7 +117,9 @@ const IndividualStats: React.FC<IndividualStatsProps> = ({
                 },
               },
             }}
+            displayEmpty
           >
+            <MenuItem value=""><em>Select a user...</em></MenuItem>
             {users.map((user) => (
               <MenuItem key={user.id} value={user.id}>
                 {user.name}
@@ -161,19 +142,7 @@ const IndividualStats: React.FC<IndividualStatsProps> = ({
               <Grid container spacing={3} justifyContent="center" alignItems="center" sx={{ mt: 2 }}>
                 {data.reactedToMost && (
                   <Grid item xs={12} md={6} lg={4} sx={{ display: 'flex', justifyContent: 'center' }}>
-                    <Paper 
-                      sx={{
-                        background: muiTheme.palette.background.paper,
-                        p: 3,
-                        borderRadius: 2,
-                        boxShadow: muiTheme.shadows[2],
-                        '&:hover': {
-                          transform: 'translateY(-4px)',
-                          boxShadow: muiTheme.shadows[6]
-                        },
-                        transition: 'all 0.3s ease-in-out'
-                      }}
-                    >
+                    <Paper sx={{ p: 2, textAlign: 'center', background: 'linear-gradient(135deg, #f4f7fa 70%, #e3ecf7 100%)', boxShadow: 3, borderRadius: 3, border: '1px solid #d6e0ef' }}>
                       <Typography variant="h6" color="text.secondary">Reacted To Most</Typography>
                       <Typography variant="h4">{data.reactedToMost.name}</Typography>
                       <Typography variant="body1" color="text.secondary">{data.reactedToMost.count} times</Typography>
@@ -183,19 +152,7 @@ const IndividualStats: React.FC<IndividualStatsProps> = ({
                 )}
                 {data.receivedMostReactionsFrom && (
                   <Grid item xs={12} md={6} lg={4} sx={{ display: 'flex', justifyContent: 'center' }}>
-                    <Paper 
-                      sx={{
-                        background: muiTheme.palette.background.paper,
-                        p: 3,
-                        borderRadius: 2,
-                        boxShadow: muiTheme.shadows[2],
-                        '&:hover': {
-                          transform: 'translateY(-4px)',
-                          boxShadow: muiTheme.shadows[6]
-                        },
-                        transition: 'all 0.3s ease-in-out'
-                      }}
-                    >
+                    <Paper sx={{ p: 2, textAlign: 'center', background: 'linear-gradient(135deg, #f4f7fa 70%, #e3ecf7 100%)', boxShadow: 3, borderRadius: 3, border: '1px solid #d6e0ef' }}>
                       <Typography variant="h6" color="text.secondary">Received Most Reactions From</Typography>
                       <Typography variant="h4">{data.receivedMostReactionsFrom.name}</Typography>
                       <Typography variant="body1" color="text.secondary">{data.receivedMostReactionsFrom.count} times</Typography>

@@ -881,26 +881,48 @@ uniqueUserIds.forEach(uid => {
 
 
 export async function getIndividualStats(dbBuffer: ArrayBuffer, userId: string): Promise<IndividualStatsData> {
+    debug.log('getIndividualStats: called with userId', userId);
     if (!userId) {
+        debug.log('getIndividualStats: No userId provided');
         throw new Error('User ID is required to get individual stats.');
     }
 
     try {
+        debug.log('getIndividualStats: creating database from buffer');
         const db = await createDatabaseFromBuffer(dbBuffer);
 
         // Find the canonical serviceId AND id for the given user ID
         const getIdsQuery = `SELECT id, serviceId FROM conversations WHERE id = '${userId}' OR serviceId = '${userId}' LIMIT 1`;
+        debug.log('getIndividualStats: getIdsQuery', getIdsQuery);
         const getIdsResult = db.exec(getIdsQuery);
-        const userUUID = getIdsResult[0]?.values[0]?.[0] as string || userId;
-        const userServiceId = getIdsResult[0]?.values[0]?.[1] as string || userId;
+        debug.log('getIndividualStats: getIdsResult', getIdsResult);
+        if (!getIdsResult[0] || !getIdsResult[0].values[0]) {
+            debug.log(`getIndividualStats: User not found in conversations table for userId=${userId}`);
+            return {
+                totalMessagesSent: 0,
+                mostPopularDay: '',
+                totalReactionsSent: 0,
+                reactedToMost: null,
+                receivedMostReactionsFrom: null,
+                mostPopularMessage: null,
+                uniqueReactions: []
+            };
+        }
+        const userUUID = getIdsResult[0].values[0][0] as string;
+        const userServiceId = getIdsResult[0].values[0][1] as string;
+        debug.log('getIndividualStats: userUUID', userUUID, 'userServiceId', userServiceId);
 
         const totalMessagesQuery = `SELECT COUNT(*) FROM messages WHERE sourceServiceId = '${userServiceId}'`;
+        debug.log('getIndividualStats: totalMessagesQuery', totalMessagesQuery);
         const totalMessagesResult = db.exec(totalMessagesQuery);
+        debug.log('getIndividualStats: totalMessagesResult', totalMessagesResult);
         const totalMessagesSent = totalMessagesResult[0]?.values[0]?.[0] as number || 0;
 
         // Calculate most popular day in JS for robustness
         const allTimestampsQuery = `SELECT sent_at FROM messages WHERE sourceServiceId = '${userServiceId}'`;
+        debug.log('getIndividualStats: allTimestampsQuery', allTimestampsQuery);
         const timestampsResult = db.exec(allTimestampsQuery);
+        debug.log('getIndividualStats: timestampsResult', timestampsResult);
         let mostPopularDay = 'N/A';
         if (timestampsResult[0]?.values.length > 0) {
             const dayCounts = Array(7).fill(0); // Sunday - Saturday
@@ -914,10 +936,13 @@ export async function getIndividualStats(dbBuffer: ArrayBuffer, userId: string):
             const dayMap = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
             mostPopularDay = dayMap[popularDayIndex];
         }
+        debug.log('getIndividualStats: mostPopularDay', mostPopularDay);
 
         // Use the user's UUID (conversations.id) for reactions, as per the user's view
         const totalReactionsQuery = `SELECT COUNT(*) FROM reactions WHERE fromId = '${userUUID}'`;
+        debug.log('getIndividualStats: totalReactionsQuery', totalReactionsQuery);
         const totalReactionsResult = db.exec(totalReactionsQuery);
+        debug.log('getIndividualStats: totalReactionsResult', totalReactionsResult);
         const totalReactionsSent = totalReactionsResult[0]?.values[0]?.[0] as number || 0;
 
         // KPI: Reacted To Most
@@ -930,7 +955,9 @@ export async function getIndividualStats(dbBuffer: ArrayBuffer, userId: string):
             ORDER BY count DESC
             LIMIT 1;
         `;
+        debug.log('getIndividualStats: reactedToMostQuery', reactedToMostQuery);
         const reactedToMostResult = db.exec(reactedToMostQuery);
+        debug.log('getIndividualStats: reactedToMostResult', reactedToMostResult);
         let reactedToMost = null;
         if (reactedToMostResult[0]?.values[0]) {
             const targetSvcId = reactedToMostResult[0].values[0][0] as string;
@@ -945,7 +972,9 @@ export async function getIndividualStats(dbBuffer: ArrayBuffer, userId: string):
                 ORDER BY count DESC
                 LIMIT 1;
             `;
+            debug.log('getIndividualStats: topEmojiQuery (reactedToMost)', topEmojiQuery);
             const topEmojiResult = db.exec(topEmojiQuery);
+            debug.log('getIndividualStats: topEmojiResult (reactedToMost)', topEmojiResult);
             const emoji = topEmojiResult[0]?.values[0]?.[0] as string || '??';
             reactedToMost = { name, count, emoji };
         }
@@ -960,7 +989,9 @@ export async function getIndividualStats(dbBuffer: ArrayBuffer, userId: string):
             ORDER BY count DESC
             LIMIT 1;
         `;
+        debug.log('getIndividualStats: receivedMostQuery', receivedMostQuery);
         const receivedMostResult = db.exec(receivedMostQuery);
+        debug.log('getIndividualStats: receivedMostResult', receivedMostResult);
         let receivedMostReactionsFrom = null;
         if (receivedMostResult[0]?.values[0]) {
             const fromId = receivedMostResult[0].values[0][0] as string;
@@ -975,7 +1006,9 @@ export async function getIndividualStats(dbBuffer: ArrayBuffer, userId: string):
                 ORDER BY count DESC
                 LIMIT 1;
             `;
+            debug.log('getIndividualStats: topEmojiQuery (receivedMost)', topEmojiQuery);
             const topEmojiResult = db.exec(topEmojiQuery);
+            debug.log('getIndividualStats: topEmojiResult (receivedMost)', topEmojiResult);
             const emoji = topEmojiResult[0]?.values[0]?.[0] as string || '??';
             receivedMostReactionsFrom = { name, count, emoji };
         }
@@ -1002,7 +1035,9 @@ export async function getIndividualStats(dbBuffer: ArrayBuffer, userId: string):
             ORDER BY reaction_count DESC
             LIMIT 1;
         `;
+        debug.log('getIndividualStats: popularMessageQuery', popularMessageQuery);
         const popularMessageResult = db.exec(popularMessageQuery);
+        debug.log('getIndividualStats: popularMessageResult', popularMessageResult);
         let mostPopularMessage = null;
         if (popularMessageResult[0]?.values[0]) {
             const messageId = popularMessageResult[0].values[0][0] as string;
@@ -1025,11 +1060,21 @@ export async function getIndividualStats(dbBuffer: ArrayBuffer, userId: string):
                 JOIN conversations c ON nr.fromId = c.id
                 WHERE nr.rn = 1;
             `;
+            debug.log('getIndividualStats: reactionsForMessageQuery', reactionsForMessageQuery);
             const reactionsForMessageResult = db.exec(reactionsForMessageQuery);
+            debug.log('getIndividualStats: reactionsForMessageResult', reactionsForMessageResult);
             const reactions = reactionsForMessageResult[0] ? reactionsForMessageResult[0].values.map((row: any) => ({ emoji: row[0], sender: row[1] })) : [];
             mostPopularMessage = { text, reactionCount, reactions };
         }
 
+        debug.log('getIndividualStats: returning stats', {
+            totalMessagesSent,
+            mostPopularDay,
+            totalReactionsSent,
+            reactedToMost,
+            receivedMostReactionsFrom,
+            mostPopularMessage
+        });
         return {
             totalMessagesSent,
             mostPopularDay,
@@ -1037,7 +1082,6 @@ export async function getIndividualStats(dbBuffer: ArrayBuffer, userId: string):
             reactedToMost,
             receivedMostReactionsFrom,
             mostPopularMessage,
-            // Collect all unique emoji reactions sent by the user
             uniqueReactions: (() => {
                 const uniqueEmojiQuery = `SELECT DISTINCT emoji FROM reactions WHERE fromId = '${userUUID}'`;
                 const uniqueEmojiResult = db.exec(uniqueEmojiQuery);
@@ -1045,7 +1089,7 @@ export async function getIndividualStats(dbBuffer: ArrayBuffer, userId: string):
             })()
         };
     } catch (error) {
-        console.error(`Error getting stats for user ${userId}:`, error);
+        debug.log(`Error getting stats for user ${userId}:`, error);
         throw new Error('Failed to get individual stats.');
     }
 }
