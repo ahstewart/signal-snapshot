@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useNavigate, Routes, Route, Link, useLocation } from 'react-router-dom';
+import { useNavigate, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
 import { 
     AppBar, 
     Box, 
@@ -344,10 +344,10 @@ function App() {
                     <ListItem disablePadding>
                         <ListItemButton 
                             component={Link} 
-                            to="/" 
-                            selected={location.pathname === '/'}
+                            to="/groupchats"
+                            selected={location.pathname === '/groupchats'}
                             disabled={!dbBuffer}
-                            sx={location.pathname === '/' ? { backgroundColor: '#e3ecf7', fontWeight: 600 } : {}}
+                            sx={location.pathname === '/groupchats' ? { backgroundColor: '#e3ecf7', fontWeight: 600 } : {}}
                         >
                             <ListItemIcon>
                                 <DashboardIcon />
@@ -438,6 +438,12 @@ function App() {
                         />
                         <Route
                             path="/"
+                            element={
+                                <Navigate to="/groupchats" replace />
+                            }
+                        />
+                        <Route
+                            path="/groupchats"
                             element={
                                 <Dashboard
                                     data={analyticsData}
