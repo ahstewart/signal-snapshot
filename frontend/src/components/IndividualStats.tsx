@@ -10,14 +10,13 @@ import {
   ListItemText,
   MenuItem,
   Paper,
-  Select,
-  SelectChangeEvent,
   Typography,
   useTheme,
+  Autocomplete,
+  TextField,
 } from '@mui/material';
 import { User as DbUser } from '../utils/database';
-import ClearIcon from '@mui/icons-material/Clear';
-import IconButton from '@mui/material/IconButton';
+import { PageHeader } from './PageHeader';
 
 interface User {
   id: string;
@@ -69,11 +68,11 @@ const IndividualStats: React.FC<IndividualStatsProps> = ({
   loading,
   error
 }) => {
-  const handleUserChange = (event: SelectChangeEvent<string>) => {
-    onUserSelect(event.target.value);
+  const handleUserChange = (_event: React.SyntheticEvent, value: string | null) => {
+    onUserSelect(value || '');
   };
 
-  const muiTheme = useTheme();
+  const theme = useTheme();
 
   const renderKpiCard = (title: string, value: string | number) => {
     return (
@@ -96,61 +95,37 @@ const IndividualStats: React.FC<IndividualStatsProps> = ({
 
   return (
     <Box sx={{ p: 4 }}>
-      <Typography variant="h4" gutterBottom>
-        Individuals
-      </Typography>
-
-      {users.length > 0 && (
-        <FormControl fullWidth sx={{ mb: 4 }}>
-          <InputLabel id="user-select-label">Select User</InputLabel>
-          <Select
-            labelId="user-select-label"
-            value={selectedUser}
-            label="Select User"
+      <PageHeader 
+        title="Individual Statistics"
+        subtitle="Select a user to view their chat metrics and engagement statistics."
+      >
+        {users.length > 0 && (
+          <Autocomplete
+            size="small"
+            sx={{ minWidth: 300, mt: { xs: 2, sm: 0 } }}
+            options={users.map(user => user.id)}
+            getOptionLabel={(id) => {
+              const user = users.find(u => u.id === id);
+              return user?.name || id;
+            }}
+            value={selectedUser || null}
             onChange={handleUserChange}
-            sx={{
-              '& .MuiOutlinedInput-root': {
-                '&:hover fieldset': {
-                  borderColor: 'primary.main',
-                },
-              },
-            }}
-            displayEmpty
-            renderValue={selected => {
-              if (!selected) return <em>Select a user...</em>;
-              const user = users.find(u => u.id === selected);
-              return user ? user.name : <em>Select a user...</em>;
-            }}
-            endAdornment={
-              selectedUser && (
-                <IconButton
-                  aria-label="clear selection"
-                  edge="end"
-                  size="small"
-                  onClick={e => {
-                    e.stopPropagation();
-                    onUserSelect('');
-                  }}
-                  sx={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)' }}
-                >
-                  <ClearIcon fontSize="small" />
-                </IconButton>
-              )
-            }
-          >
-            <MenuItem value=""><em>Select a user...</em></MenuItem>
-            {users.map((user) => (
-              <MenuItem key={user.id} value={user.id}>
-                {user.name}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
-      )}
+            renderInput={(params) => (
+              <TextField 
+                {...params} 
+                label="Select User" 
+                variant="outlined"
+                size="small"
+              />
+            )}
+            isOptionEqualToValue={(option, value) => option === value}
+          />
+        )}
+      </PageHeader>
 
       {/* Only show stats if a user is selected and data is available */}
       {selectedUser && data && (
-        <>
+        <Box>
           <Grid container spacing={3}>
             {renderKpiCard('Total Messages Sent', data.totalMessagesSent)}
             {renderKpiCard('Most Popular Day', data.mostPopularDay)}
@@ -189,10 +164,10 @@ const IndividualStats: React.FC<IndividualStatsProps> = ({
                   p: 4, 
                   width: '100%',
                   maxWidth: '800px',
-                  background: muiTheme.palette.background.paper,
-                  boxShadow: muiTheme.shadows[2],
+                  background: theme.palette.background.paper,
+                  boxShadow: theme.shadows[2],
                   '&:hover': {
-                    boxShadow: muiTheme.shadows[4]
+                    boxShadow: theme.shadows[4]
                   },
                   transition: 'box-shadow 0.3s ease-in-out'
                 }}
@@ -206,7 +181,7 @@ const IndividualStats: React.FC<IndividualStatsProps> = ({
                     mb: 2, 
                     borderRadius: 1, 
                     bgcolor: 'background.default',
-                    borderLeft: `4px solid ${muiTheme.palette.primary.main}`
+                    borderLeft: `4px solid ${theme.palette.primary.main}`
                   }}
                 >
                   <Typography variant="body1" sx={{ fontStyle: 'italic' }}>
@@ -228,7 +203,7 @@ const IndividualStats: React.FC<IndividualStatsProps> = ({
                         sx={{ 
                           py: 1,
                           '&:not(:last-child)': {
-                            borderBottom: `1px solid ${muiTheme.palette.divider}`
+                            borderBottom: `1px solid ${theme.palette.divider}`
                           }
                         }}
                       >
@@ -251,7 +226,7 @@ const IndividualStats: React.FC<IndividualStatsProps> = ({
               </Paper>
             </Grid>
           )}
-        </>
+        </Box>
       )}
     </Box>
   );

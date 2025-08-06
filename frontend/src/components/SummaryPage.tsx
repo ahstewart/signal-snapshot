@@ -1,6 +1,7 @@
 import React from 'react';
 import { Box, Typography, Paper, CircularProgress, Alert, Grid, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
 import { AnalyticsData, User, UserActivity } from '../utils/database';
+import { PageHeader } from './PageHeader';
 
 interface SummaryPageProps {
     data: AnalyticsData | null;
@@ -55,12 +56,10 @@ const SummaryPage: React.FC<SummaryPageProps> = ({ data, loading, error, users }
 
     return (
         <Box sx={{ p: 3 }}>
-            <Typography variant="h4" gutterBottom>
-                Summary
-            </Typography>
-            <Typography variant="body1" sx={{ mb: 3 }}>
-                Welcome to your Signal Snapshot! Use the navigation menu to your left to explore different layers of your Signal ecosystem. 
-            </Typography>
+            <PageHeader 
+                title="Signal Snapshot Dashboard"
+                subtitle="Welcome to your Signal Snapshot! Explore different layers of your Signal ecosystem."
+            />
             {loading && (
                 <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 200 }}>
                     <CircularProgress />

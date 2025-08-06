@@ -3,6 +3,7 @@ import { Box, Typography, Paper, CircularProgress, Alert, Grid, Table, TableBody
 import { Autocomplete, TextField } from '@mui/material';
 import { AnalyticsData, User, Conversation } from '../utils/database';
 import { UserStatsComparison } from './UserStatsComparison';
+import { PageHeader } from './PageHeader';
 
 interface OneOnOnesPageProps {
     data: AnalyticsData | null;
@@ -42,9 +43,122 @@ const OneOnOnesPage: React.FC<OneOnOnesPageProps> = ({ data, loading, error, use
     console.log('[OneOnOnesPage] selectedConversationId:', selectedConversationId);
     console.log('[OneOnOnesPage] selectedConversation:', selectedConversation);
 
-    const totalMessages = data?.kpis?.total_messages ?? 0;
-    const totalConversations = privateConversations.length;
-    const totalUsers = users.length;
+    // State for conversation messages and KPIs
+    const [conversationKPIs, setConversationKPIs] = React.useState({
+        totalMessages: '...',
+        avgMessagesPerDay: '...',
+        mostPopularDay: '...',
+        mostPopularHour: '...',
+        loading: false,
+        error: null as string | null
+    });
+
+    // Fetch and calculate KPIs when conversation changes
+    React.useEffect(() => {
+        const fetchAndCalculateKPIs = async () => {
+            if (!selectedConversation || !dbBuffer) {
+                setConversationKPIs(prev => ({
+                    ...prev,
+                    loading: false,
+                    error: 'No conversation selected or database not available'
+                }));
+                return;
+            }
+
+            setConversationKPIs(prev => ({ ...prev, loading: true, error: null }));
+
+            try {
+                const SQL = await import('sql.js');
+                const databaseModule = await import('../utils/database');
+                const sqlJs = await databaseModule.getSqlJs();
+                const db = new sqlJs.Database(new Uint8Array(dbBuffer));
+
+                try {
+                    // Query messages for the selected conversation
+                    const query = `
+                        SELECT 
+                            COUNT(*) as total_messages,
+                            MIN(received_at) as first_message,
+                            MAX(received_at) as last_message
+                        FROM messages 
+                        WHERE conversationId = '${selectedConversation.id}'
+                        AND sourceServiceId IS NOT NULL
+                    `;
+                    
+                    const result = db.exec(query);
+                    
+                    if (result.length === 0 || !result[0].values || result[0].values.length === 0) {
+                        throw new Error('No message data found for conversation');
+                    }
+
+                    const [totalMessages, firstMessage, lastMessage] = result[0].values[0];
+
+                    // Calculate average messages per day
+                    let avgMessagesPerDay = '...';
+                    if (firstMessage && lastMessage) {
+                        const firstDate = new Date(firstMessage);
+                        const lastDate = new Date(lastMessage);
+                        const diffTime = Math.abs(lastDate.getTime() - firstDate.getTime());
+                        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) || 1;
+                        avgMessagesPerDay = (totalMessages / diffDays).toFixed(1);
+                    }
+
+                    // Query for most popular day and hour
+                    const statsQuery = `
+                        SELECT 
+                            strftime('%w', datetime(received_at/1000, 'unixepoch')) as day_of_week,
+                            strftime('%H', datetime(received_at/1000, 'unixepoch')) as hour_of_day,
+                            COUNT(*) as message_count
+                        FROM messages 
+                        WHERE conversationId = '${selectedConversation.id}'
+                        AND sourceServiceId IS NOT NULL
+                        GROUP BY day_of_week, hour_of_day
+                        ORDER BY message_count DESC
+                        LIMIT 1
+                    `;
+
+                    const statsResult = db.exec(statsQuery);
+                    
+                    let mostPopularDay = '...';
+                    let mostPopularHour = '...';
+
+                    if (statsResult.length > 0 && statsResult[0].values && statsResult[0].values.length > 0) {
+                        const [dayOfWeek, hourOfDay] = statsResult[0].values[0];
+                        
+                        // Convert day of week (0-6, where 0 is Sunday) to day name
+                        const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                        mostPopularDay = days[parseInt(dayOfWeek, 10)] || '...';
+                        
+                        // Convert 24-hour format to 12-hour format
+                        const hourNum = parseInt(hourOfDay, 10);
+                        const ampm = hourNum >= 12 ? 'PM' : 'AM';
+                        const hour12 = ((hourNum + 11) % 12 + 1);
+                        mostPopularHour = `${hour12} ${ampm}`;
+                    }
+
+                    setConversationKPIs({
+                        totalMessages,
+                        avgMessagesPerDay,
+                        mostPopularDay,
+                        mostPopularHour,
+                        loading: false,
+                        error: null
+                    });
+                } finally {
+                    db.close();
+                }
+            } catch (error) {
+                console.error('Error calculating conversation KPIs:', error);
+                setConversationKPIs(prev => ({
+                    ...prev,
+                    loading: false,
+                    error: 'Failed to load conversation statistics'
+                }));
+            }
+        };
+
+        fetchAndCalculateKPIs();
+    }, [selectedConversation, dbBuffer]);
 
     const renderKpiCard = (title: string, value: string | number) => (
         <Grid item xs={12} sm={6} md={3}>
@@ -57,12 +171,31 @@ const OneOnOnesPage: React.FC<OneOnOnesPageProps> = ({ data, loading, error, use
 
     return (
         <Box sx={{ p: 3 }}>
-            <Typography variant="h4" gutterBottom>
-                1:1s
-            </Typography>
-            <Typography variant="body1" sx={{ mb: 3 }}>
-                Select a one-on-one chat to view its metrics.
-            </Typography>
+            <PageHeader 
+                title="1:1 Conversations"
+                subtitle="Select a user to analyze your private chat patterns and statistics."
+            >
+                <Autocomplete
+                    size="small"
+                    sx={{ minWidth: 300, mt: { xs: 2, sm: 0 } }}
+                    options={privateConversations.map(c => c.id)}
+                    getOptionLabel={id => {
+                        const convo = privateConversations.find(c => c.id === id);
+                        return convo?.name || id;
+                    }}
+                    value={selectedConversationId}
+                    onChange={(_e, value) => setSelectedConversationId(value)}
+                    renderInput={params => (
+                        <TextField 
+                            {...params} 
+                            label="Select Conversation" 
+                            variant="outlined"
+                            size="small"
+                        />
+                    )}
+                    isOptionEqualToValue={(option, value) => option === value}
+                />
+            </PageHeader>
             {loading && (
                 <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 200 }}>
                     <CircularProgress />
@@ -75,63 +208,14 @@ const OneOnOnesPage: React.FC<OneOnOnesPageProps> = ({ data, loading, error, use
             )}
             {!loading && !error && (
                 <>
-                    <Autocomplete
-                        options={privateConversations.map(c => c.id)}
-                        getOptionLabel={id => {
-                            const convo = privateConversations.find(c => c.id === id);
-                            return convo?.name || id;
-                        }}
-                        value={selectedConversationId}
-                        onChange={(_e, value) => setSelectedConversationId(value)}
-                        renderInput={params => <TextField {...params} label="Filter by 1:1 Conversation" />}
-                        isOptionEqualToValue={(option, value) => option === value}
-                        sx={{ mb: 4, maxWidth: 400 }}
-                    />
+
                     {selectedConversationId && (
                         <>
                             <Grid container spacing={3} sx={{ mb: 4 }}>
-                                {renderKpiCard('Total Messages', selectedConversation?.messageCount ?? '...')}
-                                {renderKpiCard('Average Messages per Day', (selectedConversation && (selectedConversation as any).avgMessagesPerDay) ?? '...')}
-                                {renderKpiCard('Most Popular Day', (() => {
-                                    if (!selectedConversation || !data?.message_counts?.by_day) return '...';
-                                    const convoId = selectedConversation.id;
-                                    // Get per-day-of-week averages
-                                    let dayCounts: Record<string, number> = {};
-                                    let totalDays: Record<string, number> = {};
-                                    // Helper: get day of week string
-                                    const getDay = (dateStr: string) => {
-                                        const d = new Date(dateStr);
-                                        return d.toLocaleDateString('en-US', { weekday: 'long' });
-                                    };
-                                    // Use per-conversation if available
-                                    let byDay = data.message_counts.by_day[convoId] || data.message_counts.by_day;
-                                    if (!byDay || typeof Object.values(byDay)[0] !== 'number') return '...';
-                                    Object.entries(byDay).forEach(([date, count]) => {
-                                        const dow = getDay(date);
-                                        dayCounts[dow] = (dayCounts[dow] || 0) + count;
-                                        totalDays[dow] = (totalDays[dow] || 0) + 1;
-                                    });
-                                    const avgByDow = Object.entries(dayCounts).map(([dow, total]) => [dow, total / totalDays[dow]]);
-                                    if (!avgByDow.length) return '...';
-                                    const [bestDay] = avgByDow.reduce((max, curr) => curr[1] > max[1] ? curr : max);
-                                    return bestDay;
-                                })())}
-                                {renderKpiCard('Most Popular Hour (US Pacific Time)', (() => {
-                                    if (!selectedConversation || !data?.message_counts?.by_hour) return '...';
-                                    const convoId = selectedConversation.id;
-                                    // If by_hour is structured as { [hour]: count }, but not per-conversation, fallback to global
-                                    let byHour = data.message_counts.by_hour[convoId] || data.message_counts.by_hour;
-                                    if (!byHour || typeof Object.values(byHour)[0] !== 'number') return '...';
-                                    const entries = Object.entries(byHour);
-                                    if (!entries.length) return '...';
-                                    const [maxHour, ] = entries.reduce((max, curr) => curr[1] > max[1] ? curr : max);
-                                    // Format hour as 12-hour with AM/PM (Pacific Time)
-                                    const hourNum = parseInt(maxHour, 10);
-                                    if (isNaN(hourNum)) return maxHour;
-                                    const ampm = hourNum >= 12 ? 'PM' : 'AM';
-                                    const hour12 = ((hourNum + 11) % 12 + 1);
-                                    return `${hour12} ${ampm}`;
-                                })())}
+                                {renderKpiCard('Total Messages', conversationKPIs.totalMessages)}
+                                {renderKpiCard('Average Messages per Day', conversationKPIs.avgMessagesPerDay)}
+                                {renderKpiCard('Most Active Day', conversationKPIs.mostPopularDay)}
+                                {renderKpiCard('Most Active Hour (PT)', conversationKPIs.mostPopularHour)}
                             </Grid>
                             {/* Two-column user stats comparison widget */}
 {selectedConversation && (

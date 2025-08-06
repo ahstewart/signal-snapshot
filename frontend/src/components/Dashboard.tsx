@@ -35,7 +35,7 @@ import {
 import { Autocomplete, TextField } from '@mui/material';
 
 import { loadDatabase, Conversation, AnalyticsData, EmotionUserData, User } from '../utils/database';
-
+import { PageHeader } from './PageHeader';
 
 // -----------------------------------------------------------------------------
 // Types
@@ -448,16 +448,14 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   return (
     <Box sx={{ p: 3 }}>
-      <Typography variant="h4" gutterBottom>
-        Group Chats
-      </Typography>
-      <Typography variant="body1" sx={{ mb: 3 }}>
-        Select a group chat to view its metrics.
-      </Typography>
-
-      {analyticsData.all_conversations && (
-        <Box sx={{ mb: 4 }}>
+      <PageHeader 
+        title="Group Chat Analytics"
+        subtitle="Analyze group chat statistics and engagement metrics."
+      >
+        {analyticsData.all_conversations && (
           <Autocomplete
+            size="small"
+            sx={{ minWidth: 300, mt: { xs: 2, sm: 0 } }}
             options={analyticsData.all_conversations.map((convo: Conversation) => convo.id)}
             getOptionLabel={(id) => {
               const conversation = analyticsData.all_conversations.find((c: Conversation) => c.id === id);
@@ -465,12 +463,20 @@ const Dashboard: React.FC<DashboardProps> = ({
             }}
             value={selectedConversationIds[0] || null}
             onChange={handleConversationChange}
-            renderInput={(params) => <TextField {...params} label="Filter by Conversation" />}
+            renderInput={(params) => (
+              <TextField 
+                {...params} 
+                label="Select Group Chat" 
+                variant="outlined"
+                size="small"
+              />
+            )}
             isOptionEqualToValue={(option, value) => option === value}
           />
-          {renderConversationSummary()}
-        </Box>
-      )}
+        )}
+      </PageHeader>
+
+      {renderConversationSummary()}
 
       {renderKpiSummary()}
       <Grid container spacing={3} sx={{ mt: 2 }}>

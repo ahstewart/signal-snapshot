@@ -76,6 +76,8 @@ export interface Conversation {
     messageCount?: number;
     active_at?: string | null;
     avgMessagesPerDay?: number;
+    firstMessage?: string;
+    lastMessage?: string;
 }
 
 export interface Award {

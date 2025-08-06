@@ -15,46 +15,85 @@ interface UserStatsComparisonProps {
 // Helper: Find the two participants for a 1:1 conversation
 async function getParticipants(conversation: Conversation, users: User[], dbBuffer?: ArrayBuffer): Promise<User[]> {
   if (!conversation || !users.length) return [];
-  // Try to find the verified user from the database
+  
+  console.debug('[UserStatsComparison] Getting participants for conversation:', {
+    conversationId: conversation.id,
+    conversationName: conversation.name,
+    availableUsers: users.map(u => ({ id: u.id, name: u.name }))
+  });
+  
+  // First, identify the selected user from the conversation
+  // In Signal, the conversation name is typically the other user's name in a 1:1 chat
+  const selectedUser = users.find(u => 
+    u.name === conversation.name || 
+    (u as any).profileFullName === conversation.name ||
+    u.id === conversation.id
+  );
+  
+  console.debug('[UserStatsComparison] Selected user from conversation:', selectedUser);
+  
+  // If we couldn't find a selected user, use the first available user
+  const firstUser = selectedUser || users[0];
+  if (!firstUser) return [];
+  
+  // Now find the verified user
   let verifiedUser: User | undefined;
-  if (dbBuffer) {
+  
+  if (dbBuffer && dbBuffer.byteLength > 0) {
     try {
+      console.debug('[UserStatsComparison] Looking for verified user in database...');
+      
       const SQL = await import('sql.js');
-      const sqlJs = await (await import('../utils/database')).getSqlJs();
-      const db = new sqlJs.Database(new Uint8Array(dbBuffer));
+      const databaseModule = await import('../utils/database');
+      const sqlJs = await databaseModule.getSqlJs();
+      const dbBufferView = new Uint8Array(dbBuffer);
+      const db = new sqlJs.Database(dbBufferView);
+      
+      // Query to find the verified user (verified = 1)
       const query = `SELECT id, profileFullName, profileName FROM conversations WHERE json_extract(json, '$.verified') = 1 LIMIT 1`;
       const res = db.exec(query);
-      console.debug(`[UserStatsComparison] Participants query results: ${JSON.stringify(res)}`);
-      if (res[0] && res[0].values && res[0].values.length > 0) {
+      
+      if (res[0]?.values?.[0]) {
         const [id, profileFullName, profileName] = res[0].values[0];
         const name = (profileFullName || profileName || '').trim();
+        
+        console.debug(`[UserStatsComparison] Found verified user in DB - ID: ${id}, Name: ${name}`);
+        
+        // Find the verified user in our users array
         verifiedUser = users.find(u => u.id === id || u.name === name);
+        
         if (verifiedUser) {
           verifiedUser.fromId = id;
+          console.debug(`[UserStatsComparison] Using verified user:`, {
+            id: verifiedUser.id,
+            name: verifiedUser.name
+          });
         }
-        console.debug(`[UserStatsComparison] Found verified user: sourceServiceId = ${verifiedUser?.id}, name = ${verifiedUser?.name}, fromId=${verifiedUser?.fromId}`)
       }
+      
       db.close();
     } catch (err) {
-      // ignore and fallback
+      console.error('[UserStatsComparison] Error finding verified user:', err);
     }
   }
-  // Heuristic for the first participant: match conversation name
-  const nameMatches = users.filter(
-    u => u.name === conversation.name || (u as any).profileFullName === conversation.name
-  );
-  console.debug(`[UserStatsComparison] nameMatches: ${JSON.stringify(nameMatches)}`);
-  let firstUser = nameMatches[0] || users[0];
-  // If verifiedUser is found and not the same as firstUser, use as second participant
+  
+  // If we have a verified user and it's not the same as the first user, use it as the second user
   if (verifiedUser && verifiedUser.id !== firstUser.id) {
+    console.debug('[UserStatsComparison] Returning users:', [firstUser, verifiedUser]);
     return [firstUser, verifiedUser];
   }
-  // Fallback to previous logic
-  if (nameMatches.length === 1) {
-    const others = users.filter(u => u.id !== nameMatches[0].id);
-    if (others.length) return [nameMatches[0], others[0]];
+  
+  // If we don't have a verified user or it's the same as the first user,
+  // find any other user that's not the first user
+  const otherUser = users.find(u => u.id !== firstUser.id);
+  if (otherUser) {
+    console.debug('[UserStatsComparison] No verified user found, using other user:', otherUser);
+    return [firstUser, otherUser];
   }
-  return users.slice(0, 2);
+  
+  // If we only have one user, return them twice (better than an empty array)
+  console.debug('[UserStatsComparison] Only one user available, using them for both positions');
+  return [firstUser, firstUser];
 }
 
 export const UserStatsComparison: React.FC<UserStatsComparisonProps> = ({ conversation, users, dbBuffer, dbKey }) => {

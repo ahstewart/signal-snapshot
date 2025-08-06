@@ -8,12 +8,11 @@ from pysqlcipher3 import dbapi2 as sqlite # The SQLCipher-enabled library
 
 def get_appdata_path(os="Windows"):
     """Gets the path to AppData\Roaming or AppData\Local."""
-    switch os:
-    case "Windows":
+    if os == "Windows":
         return os.getenv('APPDATA\Roaming')
-    case "Mac":
+    elif os == "Mac":
         return os.getenv('Library/Application Support')
-    case "Linux":
+    elif os == "Linux":
         return os.getenv('XDG_CONFIG_HOME', os.path.expanduser('~/.config'))
 
 def get_master_key(os="Windows"):
@@ -33,11 +32,11 @@ def get_master_key(os="Windows"):
         print(f"   [ERROR] Failed to get master key: {e}")
         return None
 
-def get_wrapped_db_key():
+def get_wrapped_db_key(os="Windows"):
     # (This function is the same as before)
     print("-> Finding wrapped database key...")
     try:
-        config_path = os.path.join(get_appdata_path(), 'Signal', 'config.json')
+        config_path = os.path.join(get_appdata_path(os), 'Signal', 'config.json')
         with open(config_path, 'r', encoding='utf-8') as f:
             config = json.load(f)
         wrapped_key_hex = config['key']
@@ -72,7 +71,7 @@ def export_decrypted_database(final_key):
     """Uses the final key to decrypt and export the entire database."""
     print("-> Exporting the decrypted database...")
     try:
-        db_path = os.path.join(get_appdata_path(), 'Signal', 'db.sqlite')
+        db_path = os.path.join(get_appdata_path(os), 'Signal', 'db.sqlite')
 
         # For user convenience, we'll place the output on their Desktop
         desktop_path = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop')
@@ -103,10 +102,10 @@ if __name__ == "__main__":
     print("Signal Desktop Database Decryptor & Exporter")
     print("==================================================")
 
-    master_key = get_master_key()
+    master_key = get_master_key(os)
 
     if master_key:
-        wrapped_key = get_wrapped_db_key()
+        wrapped_key = get_wrapped_db_key(os)
         if wrapped_key:
             final_key = decrypt_db_key(master_key, wrapped_key)
             if final_key:

@@ -458,6 +458,8 @@ function App() {
                                     loading={loading}
                                     error={error}
                                     users={users}
+                                    dbBuffer={dbBuffer || undefined}
+                                    dbKey={dbKey}
                                 />
                             }
                         />
