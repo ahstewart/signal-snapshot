@@ -1,32 +1,13 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useNavigate, Routes, Route, Link, useLocation, Navigate } from 'react-router-dom';
-import { 
-    AppBar, 
-    Box, 
-    Button, 
-    Container, 
-    Drawer,
-    List,
-    ListItem,
-    ListItemButton,
-    ListItemIcon,
-    ListItemText,
-    Toolbar, 
-    Typography, 
-    CircularProgress, 
-    Alert,
-    LinearProgress,
-    Divider
-} from '@mui/material';
-import DashboardIcon from '@mui/icons-material/Dashboard';
-import PersonIcon from '@mui/icons-material/Person';
-import SummarizeIcon from '@mui/icons-material/Summarize';
-import ChatIcon from '@mui/icons-material/Chat'; // Add this import
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { Box, CircularProgress } from '@mui/material';
 import ProgressDialog from './components/ProgressDialog';
 import Dashboard from './components/Dashboard';
 import IndividualStats from './components/IndividualStats';
 import SummaryPage from './components/SummaryPage';
-import OneOnOnesPage from './components/OneOnOnesPage'; // Add this import
+import OneOnOnesPage from './components/OneOnOnesPage';
+import LandingPage from './pages/LandingPage';
+import AppLayout from './components/layout/AppLayout';
 import './App.css';
 import { AnalyticsData, IndividualStatsData, loadDatabase, loadIndividualStats, loadUsers, User } from './utils/database';
 
@@ -57,8 +38,7 @@ function App() {
     // Store the original analyticsData when loaded
     const [originalAnalyticsData, setOriginalAnalyticsData] = useState<AnalyticsData | null>(null);
 
-    const navigate = useNavigate(); // Add this hook
-    const location = useLocation();
+    const navigate = useNavigate();
 
     // Handlers
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
@@ -92,8 +72,8 @@ function App() {
                 setDbKey(undefined);
             }
 
-            // After successful file upload, navigate to Summary page
-            navigate('/summary');
+            // After successful file upload, navigate to app summary page
+            navigate('/app/summary');
         } catch (err) {
             setError(`Error reading file: ${err instanceof Error ? err.message : 'Unknown error'}`);
             setShowProgress(false);
@@ -244,252 +224,96 @@ function App() {
     const drawerWidth = 240;
 
     return (
-        <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+        <>
             {progressDialog}
-            
-            {/* App Bar */}
-            <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
-                <Toolbar>
-                    <Typography variant="h6" component="div" sx={{ fontWeight: 'bold', mr: 3 }}>
-                        Signal Snapshot
-                    </Typography>
-                    
-                    {/* Spacer to push the database info and button to the right */}
-                    <Box sx={{ flexGrow: 1 }} />
-                    
-                    {/* Only show database info and change button if a database is loaded */}
-                    {dbBuffer && (
-                        <>
-                            {/* Current database info */}
-                            <Typography 
-                                variant="body2" 
-                                component="div" 
-                                sx={{ 
-                                    color: 'rgba(255, 255, 255, 0.7)',
-                                    fontFamily: 'monospace',
-                                    fontSize: '0.8rem',
-                                    maxWidth: '200px',
-                                    whiteSpace: 'nowrap',
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
-                                    mr: 1
-                                }}
-                                title={currentDbName}
-                            >
-                                {currentDbName}
-                            </Typography>
-                            
-                            {/* Hidden file input for database upload */}
-                            <input
-                                type="file"
-                                accept=".db,.sqlite,.sqlite3"
-                                onChange={handleFileChange}
-                                style={{ display: 'none' }}
-                                id="change-db-input"
-                                key={currentDbName} // Force re-render to clear the input when changing files
-                            />
-                            <Button 
-                                variant="contained"
-                                color="primary"
-                                onClick={() => document.getElementById('change-db-input')?.click()}
-                                sx={{
-                                    ml: 2,
-                                    backgroundColor: 'white',
-                                    color: 'primary.main',
-                                    '&:hover': {
-                                        backgroundColor: '#f5f5f5',
-                                        boxShadow: '0px 2px 4px -1px rgba(0,0,0,0.2), 0px 4px 5px 0px rgba(0,0,0,0.14), 0px 1px 10px 0px rgba(0,0,0,0.12)'
-                                    },
-                                    textTransform: 'none',
-                                    fontWeight: 500
-                                }}
-                            >
-                                Change Database
-                            </Button>
-                        </>
-                    )}
-                </Toolbar>
-            </AppBar>
-            
-            {/* Sidebar Navigation */}
-            <Drawer
-                variant="permanent"
-                sx={{
-                    width: drawerWidth,
-                    flexShrink: 0,
-                    [`& .MuiDrawer-paper`]: { 
-                        width: drawerWidth, 
-                        boxSizing: 'border-box',
-                        marginTop: '64px', // Height of the AppBar
-                        backgroundColor: '#f5f5f5',
-                        borderRight: '1px solid rgba(0, 0, 0, 0.12)'
-                    },
-                }}
-            >
-                <List>
-                    <ListItem disablePadding>
-                        <ListItemButton 
-                            component={Link} 
-                            to="/summary" 
-                            selected={location.pathname === '/summary'}
-                            disabled={!dbBuffer}
-                            sx={location.pathname === '/summary' ? { backgroundColor: '#e3ecf7', fontWeight: 600 } : {}}
-                        >
-                            <ListItemIcon>
-                                <SummarizeIcon />
-                            </ListItemIcon>
-                            <ListItemText primary="Summary" />
-                        </ListItemButton>
-                    </ListItem>
-                    <ListItem disablePadding>
-                        <ListItemButton 
-                            component={Link} 
-                            to="/groupchats"
-                            selected={location.pathname === '/groupchats'}
-                            disabled={!dbBuffer}
-                            sx={location.pathname === '/groupchats' ? { backgroundColor: '#e3ecf7', fontWeight: 600 } : {}}
-                        >
-                            <ListItemIcon>
-                                <DashboardIcon />
-                            </ListItemIcon>
-                            <ListItemText primary="Group Chats" />
-                        </ListItemButton>
-                    </ListItem>
-                    <ListItem disablePadding>
-                        <ListItemButton 
-                            component={Link} 
-                            to="/oneonones"
-                            selected={location.pathname === '/oneonones'}
-                            disabled={!dbBuffer}
-                            sx={location.pathname === '/oneonones' ? { backgroundColor: '#e3ecf7', fontWeight: 600 } : {}}
-                        >
-                            <ListItemIcon>
-                                <ChatIcon />
-                            </ListItemIcon>
-                            <ListItemText primary="One-on-Ones" />
-                        </ListItemButton>
-                    </ListItem>
-                    <ListItem disablePadding>
-                        <ListItemButton 
-                            component={Link} 
-                            to="/individual" 
-                            selected={location.pathname === '/individual'}
-                            disabled={!dbBuffer}
-                            sx={location.pathname === '/individual' ? { backgroundColor: '#e3ecf7', fontWeight: 600 } : {}}
-                        >
-                            <ListItemIcon>
-                                <PersonIcon />
-                            </ListItemIcon>
-                            <ListItemText primary="Individual Stats" />
-                        </ListItemButton>
-                    </ListItem>
-                </List>
-            </Drawer>
-            
-            {/* Main Content */}
-            <Box 
-                component="main" 
-                sx={{ 
-                    flexGrow: 1, 
-                    p: 3,
-                    marginTop: '64px', // Height of the AppBar
-                    width: `calc(100% - ${drawerWidth}px)`,
-                    transition: (theme) => theme.transitions.create('width', {
-                        easing: theme.transitions.easing.sharp,
-                        duration: theme.transitions.duration.enteringScreen,
-                    })
-                }}
-            >
-                {error && (
-                    <Alert severity="error" sx={{ mb: 2 }}>
-                        {error}
-                    </Alert>
-                )}
+            <Routes>
+                {/* Public routes */}
+                <Route path="/" element={<LandingPage />} />
                 
-                {!dbBuffer && !loading && (
-                    <Box sx={{ textAlign: 'center', mt: 4 }}>
-                        <input
-                            type="file"
-                            accept=".db,.sqlite,.sqlite3"
-                            onChange={handleFileChange}
-                            style={{ display: 'none' }}
-                            id="db-upload"
+                {/* App routes */}
+                <Route 
+                    path="/app"
+                    element={
+                        <AppLayout 
+                            dbBuffer={dbBuffer}
+                            currentDbName={currentDbName}
+                            onFileChange={handleFileChange}
+                            error={error}
+                            loading={loading}
                         />
-                        <label htmlFor="db-upload">
-                            <Button variant="contained" component="span">
-                                Upload Signal Database
-                            </Button>
-                        </label>
-                    </Box>
-                )}
-
-                {dbBuffer && (
-                    <Routes>
-                        <Route
-                            path="/summary"
-                            element={
-                                <SummaryPage
-                                    data={originalAnalyticsData}
-                                    loading={loading}
-                                    error={error}
-                                    users={users}
-                                />
-                            }
-                        />
-                        <Route
-                            path="/"
-                            element={
-                                <Navigate to="/groupchats" replace />
-                            }
-                        />
-                        <Route
-                            path="/groupchats"
-                            element={
-                                <Dashboard
-                                    data={analyticsData}
-                                    loading={loading}
-                                    error={error}
-                                    selectedConversationIds={selectedConversationIds}
-                                    onConversationSelect={setSelectedConversationIds}
-                                    users={users}
-                                    selectedUser={selectedUser}
-                                    onUserSelect={setSelectedUser}
-                                />
-                            }
-                        />
-                        <Route
-                            path="/oneonones"
-                            element={
-                                <OneOnOnesPage
-                                    data={analyticsData}
-                                    loading={loading}
-                                    error={error}
-                                    users={users}
-                                    dbBuffer={dbBuffer || undefined}
-                                    dbKey={dbKey}
-                                    selectedConversationId={selectedConversationId}
-                                    onConversationSelect={setSelectedConversationId}
-                                />
-                            }
-                        />
-                        <Route
-                            path="/individual"
-                            element={
-                                <IndividualStats
-                                    data={statsData}
-                                    loading={loading}
-                                    error={error}
-                                    users={users}
-                                    selectedUser={selectedUser}
-                                    onUserSelect={setSelectedUser}
-                                />
-                            }
-                        />
-                    </Routes>
-                )}
-            </Box>
-        </Box>
+                    }
+                >
+                    <Route 
+                        index 
+                        element={
+                            dbBuffer ? (
+                                <Navigate to="summary" replace />
+                            ) : (
+                                <Navigate to="summary" replace />
+                            )
+                        } 
+                    />
+                    <Route
+                        path="summary"
+                        element={
+                            <SummaryPage
+                                data={originalAnalyticsData}
+                                loading={loading}
+                                error={error}
+                                users={users}
+                            />
+                        }
+                    />
+                    <Route
+                        path="groupchats"
+                        element={
+                            <Dashboard
+                                data={analyticsData}
+                                loading={loading}
+                                error={error}
+                                selectedConversationIds={selectedConversationIds}
+                                onConversationSelect={setSelectedConversationIds}
+                                users={users}
+                                selectedUser={selectedUser}
+                                onUserSelect={setSelectedUser}
+                            />
+                        }
+                    />
+                    <Route
+                        path="oneonones"
+                        element={
+                            <OneOnOnesPage
+                                data={analyticsData}
+                                loading={loading}
+                                error={error}
+                                users={users}
+                                dbBuffer={dbBuffer || undefined}
+                                dbKey={dbKey}
+                                selectedConversationId={selectedConversationId}
+                                onConversationSelect={setSelectedConversationId}
+                            />
+                        }
+                    />
+                    <Route
+                        path="individual"
+                        element={
+                            <IndividualStats
+                                data={statsData}
+                                loading={loading}
+                                error={error}
+                                users={users}
+                                selectedUser={selectedUser}
+                                onUserSelect={setSelectedUser}
+                            />
+                        }
+                    />
+                </Route>
+                
+                {/* Redirect all other routes to home */}
+                <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+        </>
     );
-}
+};
 
 export default App;
