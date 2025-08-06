@@ -450,7 +450,7 @@ const Dashboard: React.FC<DashboardProps> = ({
     <Box sx={{ p: 3 }}>
       <PageHeader 
         title="Group Chat Analytics"
-        subtitle="Analyze group chat statistics and engagement metrics."
+        subtitle="Dig into the statistics and patterns of your group chats."
       >
         {analyticsData.all_conversations && (
           <Autocomplete

@@ -51,6 +51,7 @@ function App() {
     const [selectedConversationIds, setSelectedConversationIds] = useState<string[]>([]);
     const [selectedUser, setSelectedUser] = useState<string>('');
     const [statsData, setStatsData] = useState<IndividualStatsData | null>(null);
+    const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
 
     // For SummaryPage, always pass the original, unfiltered analyticsData
     // Store the original analyticsData when loaded
@@ -460,6 +461,8 @@ function App() {
                                     users={users}
                                     dbBuffer={dbBuffer || undefined}
                                     dbKey={dbKey}
+                                    selectedConversationId={selectedConversationId}
+                                    onConversationSelect={setSelectedConversationId}
                                 />
                             }
                         />

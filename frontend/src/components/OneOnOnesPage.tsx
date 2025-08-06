@@ -12,9 +12,20 @@ interface OneOnOnesPageProps {
     error: string | null;
     dbBuffer?: ArrayBuffer;
     dbKey?: string;
+    selectedConversationId: string | null;
+    onConversationSelect: (conversationId: string | null) => void;
 }
 
-const OneOnOnesPage: React.FC<OneOnOnesPageProps> = ({ data, loading, error, users, dbBuffer, dbKey }) => {
+const OneOnOnesPage: React.FC<OneOnOnesPageProps> = ({ 
+    data, 
+    loading, 
+    error, 
+    users, 
+    dbBuffer, 
+    dbKey, 
+    selectedConversationId, 
+    onConversationSelect 
+}) => {
     // Query directly from the original conversations table if available
     // DEBUG: Log incoming analytics data
     console.log('[OneOnOnesPage] data:', data);
@@ -36,7 +47,6 @@ const OneOnOnesPage: React.FC<OneOnOnesPageProps> = ({ data, loading, error, use
     // DEBUG: Log privateConversations after useMemo
     console.log('[OneOnOnesPage] privateConversations:', privateConversations);
 
-    const [selectedConversationId, setSelectedConversationId] = React.useState<string | null>(null);
     const selectedConversation = privateConversations.find(c => c.id === selectedConversationId);
 
     // DEBUG: Log selectedConversationId and selectedConversation
@@ -184,7 +194,9 @@ const OneOnOnesPage: React.FC<OneOnOnesPageProps> = ({ data, loading, error, use
                         return convo?.name || id;
                     }}
                     value={selectedConversationId}
-                    onChange={(_e, value) => setSelectedConversationId(value)}
+                    onChange={(_event, value) => {
+                        onConversationSelect(value);
+                    }}
                     renderInput={params => (
                         <TextField 
                             {...params} 
