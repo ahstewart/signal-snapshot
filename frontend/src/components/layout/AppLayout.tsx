@@ -47,7 +47,22 @@ const AppLayout: React.FC<AppLayoutProps> = ({
       {/* App Bar */}
       <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
         <Toolbar>
-          <Typography variant="h6" component="div" sx={{ fontWeight: 'bold', mr: 3 }}>
+          <Typography 
+            variant="h6" 
+            component={Link} 
+            to="/"
+            sx={{ 
+              fontWeight: 'bold', 
+              mr: 3, 
+              color: 'inherit',
+              textDecoration: 'none',
+              '&:hover': {
+                textDecoration: 'none',
+                cursor: 'pointer',
+                opacity: 0.9
+              }
+            }}
+          >
             Signal Snapshot
           </Typography>
           
@@ -200,7 +215,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({
         )}
         
         {!dbBuffer && !loading && (
-          <Box sx={{ textAlign: 'center', mt: 4 }}>
+          <Box sx={{ textAlign: 'center', mt: 4, ml: 2 }}>
             <input
               type="file"
               accept=".db,.sqlite,.sqlite3"

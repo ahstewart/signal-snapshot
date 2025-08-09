@@ -56,10 +56,12 @@ const SummaryPage: React.FC<SummaryPageProps> = ({ data, loading, error, users }
 
     return (
         <Box sx={{ p: 3 }}>
-            <PageHeader 
-                title="Signal Snapshot Dashboard"
-                subtitle="Welcome to your Signal Snapshot! Explore different layers of your Signal ecosystem."
-            />
+            {data && (
+                <PageHeader 
+                    title="Signal Snapshot Dashboard"
+                    subtitle="Welcome to your Signal Snapshot! Explore different layers of your Signal ecosystem."
+                />
+            )}
             {loading && (
                 <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 200 }}>
                     <CircularProgress />
