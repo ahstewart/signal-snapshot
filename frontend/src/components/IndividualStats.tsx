@@ -97,12 +97,12 @@ const IndividualStats: React.FC<IndividualStatsProps> = ({
     <Box sx={{ p: 4 }}>
       <PageHeader 
         title="Individual Statistics"
-        subtitle="Select a user to view their chat metrics and engagement statistics."
+        subtitle="Select an individual to analyze their Signal behavior."
       >
         {users.length > 0 && (
           <Autocomplete
-            size="small"
-            sx={{ minWidth: 300, mt: { xs: 2, sm: 0 } }}
+            size="medium"
+            sx={{ minWidth: 900, mt: { xs: 2, sm: 0 } }}
             options={users.map(user => user.id)}
             getOptionLabel={(id) => {
               const user = users.find(u => u.id === id);
@@ -115,7 +115,7 @@ const IndividualStats: React.FC<IndividualStatsProps> = ({
                 {...params} 
                 label="Select User" 
                 variant="outlined"
-                size="small"
+                size="medium"
               />
             )}
             isOptionEqualToValue={(option, value) => option === value}

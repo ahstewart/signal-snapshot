@@ -440,11 +440,46 @@ const Dashboard: React.FC<DashboardProps> = ({
     return <Typography>No data available.</Typography>;
   }
 
+  if (!selectedConversationIds || selectedConversationIds.length === 0) {
+    return (
+      <Box sx={{ p: 2 }}>
+        <PageHeader 
+          title="Group Chat Analytics"
+          subtitle="Dig into the statistics and patterns of your group chats."
+        >
+          {analyticsData?.all_conversations && (
+            <Autocomplete
+              size="medium"
+              sx={{ minWidth: 900, mt: { xs: 2, sm: 0 } }}
+              options={analyticsData.all_conversations.map((convo: Conversation) => convo.id)}
+              getOptionLabel={(id) => {
+                const conversation = analyticsData.all_conversations.find((c: Conversation) => c.id === id);
+                return conversation?.name || id;
+              }}
+              value={selectedConversationIds[0] || null}
+              onChange={handleConversationChange}
+              renderInput={(params) => (
+                <TextField 
+                  {...params} 
+                  label="
+                   Group Chat" 
+                  variant="outlined"
+                  size="medium"
+                />
+              )}
+              isOptionEqualToValue={(option, value) => option === value}
+            />
+          )}
+        </PageHeader>
+      </Box>
+    );
+  }
+
   return (
     <Box sx={{ p: 2 }}>
       <PageHeader 
         title="Group Chat Analytics"
-        subtitle="Dig into the statistics and patterns of your group chats."
+        subtitle="Select a group chat to analyze its content and behavior of the members."
       >
         {analyticsData.all_conversations && (
           <Autocomplete

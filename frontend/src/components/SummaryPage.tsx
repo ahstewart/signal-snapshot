@@ -31,10 +31,10 @@ const SummaryPage: React.FC<SummaryPageProps> = ({ data, loading, error, users }
               <TableBody>
                 {data.map((user: UserActivity) => (
                   <TableRow key={user.name}>
-                    <TableCell component="th" scope="row" sx={{ fontWeight: 'bold' }}>
+                    <TableCell component="th" scope="row">
                       {user.name}
                     </TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 'bold' }}>{user.count}</TableCell>
+                    <TableCell align="right">{user.count}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -95,8 +95,8 @@ const SummaryPage: React.FC<SummaryPageProps> = ({ data, loading, error, users }
                                     <TableBody>
                                         {data.top_conversations.map((convo) => (
                                             <TableRow key={convo.name}>
-                                                <TableCell sx={{ fontWeight: 'bold' }}>{convo.name}</TableCell>
-                                                <TableCell align="right" sx={{ fontWeight: 'bold' }}>{convo.count}</TableCell>
+                                                <TableCell>{convo.name}</TableCell>
+                                                <TableCell align="right">{convo.count}</TableCell>
                                             </TableRow>
                                         ))}
                                     </TableBody>
@@ -107,7 +107,7 @@ const SummaryPage: React.FC<SummaryPageProps> = ({ data, loading, error, users }
                         )}
                     </Paper>
                     <Grid container spacing={3} sx={{ mt: 0 }}>
-                         <Grid item xs={12} md={6}>
+                        <Grid item xs={12} md={6}>
                             {renderTopUsersTable(
                                 'Top Users by Message Count',
                                 data.topUsersByMessageCount,

@@ -183,11 +183,11 @@ const OneOnOnesPage: React.FC<OneOnOnesPageProps> = ({
         <Box sx={{ p: 3 }}>
             <PageHeader 
                 title="1:1 Conversations"
-                subtitle="Select a user to analyze your private chat patterns and statistics."
+                subtitle="Select a one-on-one conversation to analyze your relationship."
             >
                 <Autocomplete
-                    size="small"
-                    sx={{ minWidth: 300, mt: { xs: 2, sm: 0 } }}
+                    size="medium"
+                    sx={{ minWidth: 900, mt: { xs: 2, sm: 0 } }}
                     options={privateConversations.map(c => c.id)}
                     getOptionLabel={id => {
                         const convo = privateConversations.find(c => c.id === id);
@@ -202,7 +202,7 @@ const OneOnOnesPage: React.FC<OneOnOnesPageProps> = ({
                             {...params} 
                             label="Select Conversation" 
                             variant="outlined"
-                            size="small"
+                            size="medium"
                         />
                     )}
                     isOptionEqualToValue={(option, value) => option === value}
