@@ -215,7 +215,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({
         )}
         
         {!dbBuffer && !loading && (
-          <Box sx={{ textAlign: 'center', mt: 4, ml: 2 }}>
+          <Box sx={{ position: 'relative', left: '-130px', textAlign: 'center', mt: 4}}>
             <input
               type="file"
               accept=".db,.sqlite,.sqlite3"

@@ -236,16 +236,14 @@ const Dashboard: React.FC<DashboardProps> = ({
             <Table stickyHeader size="small">
               <TableHead>
                 <TableRow>
-                  <TableCell>Conversation</TableCell>
-                  <TableCell align="right">Messages</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>Conversation</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 'bold' }}>Messages</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {analyticsData.top_conversations.map((convo: { name: string; count: number }) => (
                   <TableRow key={convo.name}>
-                    <TableCell component="th" scope="row">
-                      {getUserName(convo.name)}
-                    </TableCell>
+                    <TableCell component="th" scope="row">{getUserName(convo.name)}</TableCell>
                     <TableCell align="right">{convo.count}</TableCell>
                   </TableRow>
                 ))}
@@ -260,9 +258,6 @@ const Dashboard: React.FC<DashboardProps> = ({
   function renderReactionAnalytics() {
     return (
       <Grid container spacing={3} sx={{ mt: 4 }}>
-        <Grid item xs={12}>
-          <Typography variant="h5" gutterBottom>Reaction Analytics</Typography>
-        </Grid>
         <Grid item xs={12} md={4}>
           <Paper sx={{ p: 2, height: '100%', textAlign: 'center' }}>
             <Typography variant="h4" component="div">{analyticsData?.reactions.total_reactions ?? '...'}</Typography>
@@ -277,8 +272,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                 <Table size="small">
                   <TableHead>
                     <TableRow>
-                      <TableCell>Emoji</TableCell>
-                      <TableCell align="right">Count</TableCell>
+                      <TableCell sx={{ fontWeight: 'bold' }}>Emoji</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 'bold' }}>Count</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -302,8 +297,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                 <Table size="small">
                   <TableHead>
                     <TableRow>
-                      <TableCell>Author</TableCell>
-                      <TableCell>Top Reactions</TableCell>
+                      <TableCell sx={{ fontWeight: 'bold' }}>Author</TableCell>
+                      <TableCell sx={{ fontWeight: 'bold' }}>Top Reactions</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -311,7 +306,9 @@ const Dashboard: React.FC<DashboardProps> = ({
                       const userName = getUserName(authorId);
                       return (
                         <TableRow key={authorId}>
-                          <TableCell component="th" scope="row" sx={{ fontFamily: 'monospace', fontSize: '0.8rem', overflowWrap: 'break-word', maxWidth: '150px' }}>{userName}</TableCell>
+                          <TableCell component="th" scope="row" sx={{ fontFamily: 'monospace', fontSize: '0.8rem', overflowWrap: 'break-word', maxWidth: '150px' }}>
+                            {userName}
+                          </TableCell>
                           <TableCell>{(emojis as EmojiCount[]).map(e => `${e.emoji} (${e.count})`).join(', ')}</TableCell>
                         </TableRow>
                       );
@@ -364,7 +361,6 @@ const Dashboard: React.FC<DashboardProps> = ({
 
     return (
       <Box sx={{ mt: 4 }}>
-        <Typography variant="h5" gutterBottom>🏆 Awards 🏆</Typography>
         <Grid container spacing={3}>
           {Object.entries(analyticsData.awards).map(([key, award]) =>
             renderAwardCard(
@@ -395,18 +391,16 @@ const Dashboard: React.FC<DashboardProps> = ({
             <Table stickyHeader size="small">
               <TableHead>
                 <TableRow>
-                  <TableCell>User</TableCell>
-                  <TableCell align="right">{totalReactsLabel}</TableCell>
-                  <TableCell align="right">Rate</TableCell>
-                  <TableCell align="right">{scoreLabel}</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>User</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 'bold' }}>{totalReactsLabel}</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 'bold' }}>Rate</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 'bold' }}>{scoreLabel}</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {data.map((user: EmotionUserData) => (
                   <TableRow key={user.name}>
-                    <TableCell component="th" scope="row">
-                      {user.name}
-                    </TableCell>
+                    <TableCell component="th" scope="row">{user.name}</TableCell>
                     <TableCell align="right">{user.totalReacts}</TableCell>
                     <TableCell align="right">{user.rate.toFixed(3)}</TableCell>
                     <TableCell align="right">{user.score.toFixed(3)}</TableCell>
@@ -480,16 +474,72 @@ const Dashboard: React.FC<DashboardProps> = ({
 
       {renderKpiSummary()}
       <Grid container spacing={3} sx={{ mt: 2 }}>
+        {/* Trends Section */}
+        <Grid item xs={5}>
+          <Typography
+            variant="h4"
+            sx={{
+              fontWeight: 'bold',
+              borderLeft: '6px solid #1976d2',
+              pl: 2,
+              mb: 2,
+              color: '#222',
+              background: 'linear-gradient(90deg, #f4f7fa 0%, #e3ecf7 100%)',
+              borderRadius: 2,
+              boxShadow: 1
+            }}
+          >
+            Trends
+          </Typography>
+        </Grid>
         <Grid item xs={12}>
           {renderDailyChart()}
         </Grid>
-        <Grid item xs={12}>
+        <Grid item xs={12} sx={{ mb: 5 }}>
            {renderHourlyChart()}
         </Grid>
-        <Grid item xs={12}>
+
+        {/* Reactions Section */}
+        <Grid item xs={5} sx={{ mb: -7 }}>
+          <Typography
+            variant="h4"
+            sx={{
+              fontWeight: 'bold',
+              borderLeft: '6px solid #1976d2',
+              pl: 2,
+              mb: 2,
+              color: '#222',
+              background: 'linear-gradient(90deg, #f4f7fa 0%, #e3ecf7 100%)',
+              borderRadius: 2,
+              boxShadow: 1
+            }}
+          >
+            Reactions
+          </Typography>
+        </Grid>
+        <Grid item xs={12} sx={{ mb: 5 }}>
           {renderReactionAnalytics()}
         </Grid>
-        <Grid item xs={12}>
+
+        {/* Awards Section */}
+        <Grid item xs={5}>
+          <Typography
+            variant="h4"
+            sx={{
+              fontWeight: 'bold',
+              borderLeft: '6px solid #1976d2',
+              pl: 2,
+              mb: 2,
+              color: '#222',
+              background: 'linear-gradient(90deg, #f4f7fa 0%, #e3ecf7 100%)',
+              borderRadius: 2,
+              boxShadow: 1
+            }}
+          >
+            Awards
+          </Typography>
+        </Grid>
+        <Grid item xs={12} sx={{ mt: -5 }}>
           {renderAwards()}
         </Grid>
         {/* Restore EmotionRankings sections */}

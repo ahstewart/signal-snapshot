@@ -24,17 +24,17 @@ const SummaryPage: React.FC<SummaryPageProps> = ({ data, loading, error, users }
             <Table stickyHeader size="small">
               <TableHead>
                 <TableRow>
-                  <TableCell>User</TableCell>
-                  <TableCell align="right">{countLabel}</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold' }}>User</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 'bold' }}>{countLabel}</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {data.map((user: UserActivity) => (
                   <TableRow key={user.name}>
-                    <TableCell component="th" scope="row">
+                    <TableCell component="th" scope="row" sx={{ fontWeight: 'bold' }}>
                       {user.name}
                     </TableCell>
-                    <TableCell align="right">{user.count}</TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 'bold' }}>{user.count}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -88,15 +88,15 @@ const SummaryPage: React.FC<SummaryPageProps> = ({ data, loading, error, users }
                                 <Table size="small">
                                     <TableHead>
                                         <TableRow>
-                                            <TableCell>Conversation</TableCell>
-                                            <TableCell align="right">Messages</TableCell>
+                                            <TableCell sx={{ fontWeight: 'bold' }}>Conversation</TableCell>
+                                            <TableCell align="right" sx={{ fontWeight: 'bold' }}>Messages</TableCell>
                                         </TableRow>
                                     </TableHead>
                                     <TableBody>
                                         {data.top_conversations.map((convo) => (
                                             <TableRow key={convo.name}>
-                                                <TableCell>{convo.name}</TableCell>
-                                                <TableCell align="right">{convo.count}</TableCell>
+                                                <TableCell sx={{ fontWeight: 'bold' }}>{convo.name}</TableCell>
+                                                <TableCell align="right" sx={{ fontWeight: 'bold' }}>{convo.count}</TableCell>
                                             </TableRow>
                                         ))}
                                     </TableBody>
