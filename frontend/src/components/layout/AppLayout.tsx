@@ -20,6 +20,9 @@ import {
   DialogContent,
   DialogContentText,
   DialogActions,
+  Tabs,
+  Tab,
+  Box as MuiBox
 } from '@mui/material';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import PersonIcon from '@mui/icons-material/Person';
@@ -49,6 +52,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({
 }) => {
   const location = useLocation();
   const [helpOpen, setHelpOpen] = useState(false);
+  const [currentTab, setCurrentTab] = useState(0);
 
   const handleHelpOpen = () => {
     setHelpOpen(true);
@@ -57,6 +61,37 @@ const AppLayout: React.FC<AppLayoutProps> = ({
   const handleHelpClose = () => {
     setHelpOpen(false);
   };
+
+  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+    setCurrentTab(newValue);
+  };
+
+  function a11yProps(index: number) {
+    return {
+      id: `simple-tab-${index}`,
+      'aria-controls': `simple-tabpanel-${index}`,
+    };
+  }
+
+  function TabPanel(props: { children?: React.ReactNode; index: number; value: number }) {
+    const { children, value, index, ...other } = props;
+  
+    return (
+      <div
+        role="tabpanel"
+        hidden={value !== index}
+        id={`simple-tabpanel-${index}`}
+        aria-labelledby={`simple-tab-${index}`}
+        {...other}
+      >
+        {value === index && (
+          <MuiBox sx={{ p: 3 }}>
+            <Typography>{children}</Typography>
+          </MuiBox>
+        )}
+      </div>
+    );
+  }
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh' }}>
@@ -244,9 +279,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({
                 variant="contained" 
                 component="span" 
                 sx={{ 
-                  height: '50px', 
-                  width: '400px',
-                  fontSize: '1.2rem',
+                  height: '40px', 
+                  width: '350px',
+                  fontSize: '1rem',
                   '& .MuiButton-label': {
                     fontWeight: 'bold'
                   }
@@ -267,31 +302,72 @@ const AppLayout: React.FC<AppLayoutProps> = ({
                         How do I do this?
                 </Button>
                 {/* Help Dialog */}
-                <Dialog open={helpOpen} onClose={handleHelpClose}>
-                <DialogTitle>Where to find your Signal database</DialogTitle>
-                <DialogContent>
-                    <DialogContentText sx={{ mb: 2 }}>
-                        Your Signal database file is stored in different locations depending on your operating system:
-                    </DialogContentText>
-                    <Box component="ul" sx={{ pl: 2, m: 0, '& > li': { mb: 1.5 } }}>
-                        <Typography component="li" variant="body1">
-                            <strong>Windows:</strong> <code>%APPDATA%\Signal\sql\db.sqlite</code>
-                        </Typography>
-                        <Typography component="li" variant="body1">
-                            <strong>macOS:</strong> <code>~/Library/Application Support/Signal/sql/db.sqlite</code>
-                        </Typography>
-                        <Typography component="li" variant="body1">
-                            <strong>Linux:</strong> <code>~/.config/Signal/sql/db.sqlite</code>
-                        </Typography>
+                <Dialog open={helpOpen} onClose={handleHelpClose} maxWidth="md" fullWidth>
+                  <DialogTitle>How to upload your Signal data</DialogTitle>
+                  <DialogContent>
+                    <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+                      <Tabs value={currentTab} onChange={handleTabChange} aria-label="signal platform tabs">
+                        <Tab label="Signal Desktop" {...a11yProps(0)} />
+                        <Tab label="Signal for Android" {...a11yProps(1)} />
+                        <Tab label="Signal for iOS" {...a11yProps(2)} />
+                      </Tabs>
                     </Box>
-                    <Typography variant="body2" color="text.secondary" sx={{ mt: 2, fontStyle: 'italic' }}>
-                        Note: You may need to enable "Show Hidden Files" in your file explorer to see these directories.
-                    </Typography>
+                    
+                    <TabPanel value={currentTab} index={0}>
+                      <DialogContentText sx={{ mb: 2 }}>
+                        Preparing your Signal Desktop data can be broken into two steps:
+                      </DialogContentText>
+                      <Box component="ol" sx={{ pl: 2, m: 0, '& > li': { mb: 2 } }}>
+                        <Typography component="li" variant="body1">
+                          <strong>Find your Signal database</strong>
+                          <Typography component="div" variant="body2" sx={{ mt: 1, pl: 2 }}>
+                            Your database is located at:
+                            <Box component="ul" sx={{ pl: 2, mt: 1, '& > li': { mb: 0.5 } }}>
+                              <li><strong>Windows:</strong> <code>AppData\Signal\sql\db.sqlite</code></li>
+                              <li><strong>macOS:</strong> <code>~/Library/Application Support/Signal/sql/db.sqlite</code></li>
+                              <li><strong>Linux:</strong> <code>~/.config/Signal/sql/db.sqlite</code></li>
+                            </Box>
+                            <Typography variant="caption" display="block" sx={{ mt: 1, fontStyle: 'italic' }}>
+                              Note: You may need to enable "Show Hidden Files" in your file explorer.
+                            </Typography>
+                          </Typography>
+                        </Typography>
+                        
+                        <Typography component="li" variant="body1">
+                          <strong>Decrypt your Signal database</strong>
+                          <Typography component="div" variant="body2" sx={{ mt: 1, pl: 2 }}>
+                            The database is encrypted. You'll need to use the Signal Decrypt tool to decrypt it before uploading.
+                          </Typography>
+                        </Typography>
+                      </Box>
+                    </TabPanel>
+                    
+                    <TabPanel value={currentTab} index={1}>
+                      <DialogContentText sx={{ mb: 2 }}>
+                        Signal Snapshot doesn't yet support Android devices.
+                      </DialogContentText>
+                      <Typography variant="body2" color="text.secondary">
+                        If you'd like Android support, send an email over to{' '}
+                        <a href="mailto:support@signalsnapshot.com" style={{ color: 'inherit' }}>support@signalsnapshot.com</a>
+                        {' '}and let us know you're interested.
+                      </Typography>
+                    </TabPanel>
+                    
+                    <TabPanel value={currentTab} index={2}>
+                      <DialogContentText sx={{ mb: 2 }}>
+                        Signal Snapshot doesn't yet support iOS devices.
+                      </DialogContentText>
+                      <Typography variant="body2" color="text.secondary">
+                        If you'd like iOS support, send an email over to{' '}
+                        <a href="mailto:support@signalsnapshot.com" style={{ color: 'inherit' }}>support@signalsnapshot.com</a>
+                        {' '}and let us know you're interested.
+                      </Typography>
+                    </TabPanel>
                   </DialogContent>
                   <DialogActions>
-                      <Button onClick={handleHelpClose} color="primary" autoFocus>
-                          Got it!
-                      </Button>
+                    <Button onClick={handleHelpClose} color="primary" autoFocus>
+                      Got it!
+                    </Button>
                   </DialogActions>
                   </Dialog>
                 </Box>
