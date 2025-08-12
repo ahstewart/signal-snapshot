@@ -1,5 +1,6 @@
 import React from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
+import { useState } from 'react';
 import { 
   AppBar, 
   Box, 
@@ -13,13 +14,19 @@ import {
   Toolbar, 
   Typography,
   Alert,
-  Divider
+  Divider,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogContentText,
+  DialogActions,
 } from '@mui/material';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import PersonIcon from '@mui/icons-material/Person';
 import SummarizeIcon from '@mui/icons-material/Summarize';
 import ChatIcon from '@mui/icons-material/Chat';
 import HomeIcon from '@mui/icons-material/Home';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 
 interface AppLayoutProps {
   dbBuffer: ArrayBuffer | null;
@@ -41,6 +48,15 @@ const AppLayout: React.FC<AppLayoutProps> = ({
   children
 }) => {
   const location = useLocation();
+  const [helpOpen, setHelpOpen] = useState(false);
+
+  const handleHelpOpen = () => {
+    setHelpOpen(true);
+  };
+
+  const handleHelpClose = () => {
+    setHelpOpen(false);
+  };
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh' }}>
@@ -215,7 +231,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({
         )}
         
         {!dbBuffer && !loading && (
-          <Box sx={{ position: 'relative', left: '-130px', textAlign: 'center', mt: 4}}>
+          <Box sx={{ position: 'relative', left: '-130px', textAlign: 'center', mt: 6}}>
             <input
               type="file"
               accept=".db,.sqlite,.sqlite3"
@@ -224,11 +240,64 @@ const AppLayout: React.FC<AppLayoutProps> = ({
               id="db-upload"
             />
             <label htmlFor="db-upload">
-              <Button variant="contained" component="span">
-                Upload Signal Database
+              <Button 
+                variant="contained" 
+                component="span" 
+                sx={{ 
+                  height: '50px', 
+                  width: '400px',
+                  fontSize: '1.2rem',
+                  '& .MuiButton-label': {
+                    fontWeight: 'bold'
+                  }
+                }}
+              >
+                Upload Your Signal Data
               </Button>
             </label>
-          </Box>
+          
+          
+          <Box sx={{left: '-130px', textAlign: 'center', mt: 8}}>
+              <Button
+                        variant="outlined"
+                        color="primary"
+                        onClick={handleHelpOpen}
+                        endIcon={<HelpOutlineIcon />}
+                    >
+                        How do I do this?
+                </Button>
+                {/* Help Dialog */}
+                <Dialog open={helpOpen} onClose={handleHelpClose}>
+                <DialogTitle>Where to find your Signal database</DialogTitle>
+                <DialogContent>
+                    <DialogContentText sx={{ mb: 2 }}>
+                        Your Signal database file is stored in different locations depending on your operating system:
+                    </DialogContentText>
+                    <Box component="ul" sx={{ pl: 2, m: 0, '& > li': { mb: 1.5 } }}>
+                        <Typography component="li" variant="body1">
+                            <strong>Windows:</strong> <code>%APPDATA%\Signal\sql\db.sqlite</code>
+                        </Typography>
+                        <Typography component="li" variant="body1">
+                            <strong>macOS:</strong> <code>~/Library/Application Support/Signal/sql/db.sqlite</code>
+                        </Typography>
+                        <Typography component="li" variant="body1">
+                            <strong>Linux:</strong> <code>~/.config/Signal/sql/db.sqlite</code>
+                        </Typography>
+                    </Box>
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 2, fontStyle: 'italic' }}>
+                        Note: You may need to enable "Show Hidden Files" in your file explorer to see these directories.
+                    </Typography>
+                  </DialogContent>
+                  <DialogActions>
+                      <Button onClick={handleHelpClose} color="primary" autoFocus>
+                          Got it!
+                      </Button>
+                  </DialogActions>
+                  </Dialog>
+                </Box>
+            </Box>
+            
+
         )}
 
         {children || <Outlet />}
