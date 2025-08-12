@@ -377,6 +377,44 @@ const AppLayout: React.FC<AppLayoutProps> = ({
         )}
 
         {children || <Outlet />}
+        
+        {/* Footer */}
+        <Box 
+          component="footer" 
+          sx={{
+            mt: 'auto',
+            py: 2,
+            px: 2,
+            textAlign: 'center',
+            borderTop: '1px solid',
+            borderColor: 'divider',
+            backgroundColor: 'background.paper',
+            position: 'fixed',
+            bottom: 0,
+            left: drawerWidth,
+            right: 0,
+            zIndex: (theme) => theme.zIndex.drawer - 1
+          }}
+        >
+          <Typography variant="body2" color="text.secondary">
+            © {new Date().getFullYear()} Signal Snapshot · 
+            <a 
+              href="https://github.com/ahstew/signal-snapshot" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              style={{ color: 'inherit', margin: '0 8px' }}
+            >
+              GitHub
+            </a>
+            ·
+            <a 
+              href="mailto:support@signalsnapshot.com" 
+              style={{ color: 'inherit', marginLeft: '8px' }}
+            >
+              support@signalsnapshot.com
+            </a>
+          </Typography>
+        </Box>
       </Box>
     </Box>
   );
