@@ -176,10 +176,12 @@ const AppLayout: React.FC<AppLayoutProps> = ({
         sx={{
           width: drawerWidth,
           flexShrink: 0,
-          [`& .MuiDrawer-paper`]: { 
-            width: drawerWidth, 
+          height: 'calc(100vh - 40px)', // Stop at the top of the footer (assuming footer height ~40px)
+          [`& .MuiDrawer-paper`]: {
+            width: drawerWidth,
             boxSizing: 'border-box',
             marginTop: '64px',
+            height: 'calc(100vh - 40px)', // Match Drawer height to stop above footer
             backgroundColor: '#f5f5f5',
             borderRight: '1px solid rgba(0, 0, 0, 0.12)'
           },
@@ -304,7 +306,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({
                 {/* Help Dialog */}
                 <Dialog open={helpOpen} onClose={handleHelpClose} maxWidth="md" fullWidth>
                   <DialogTitle>How to upload your Signal data</DialogTitle>
-                  <DialogContent>
+                  <DialogContent sx={{ minHeight: 400 }}>
                     <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
                       <Tabs value={currentTab} onChange={handleTabChange} aria-label="signal platform tabs">
                         <Tab label="Signal Desktop" {...a11yProps(0)} />
@@ -379,41 +381,39 @@ const AppLayout: React.FC<AppLayoutProps> = ({
         {children || <Outlet />}
         
         {/* Footer */}
-        <Box 
-          component="footer" 
+        <Box
           sx={{
-            mt: 'auto',
-            py: 2,
-            px: 2,
-            textAlign: 'center',
-            borderTop: '1px solid',
+            borderTop: 1,
             borderColor: 'divider',
             backgroundColor: 'background.paper',
             position: 'fixed',
             bottom: 0,
-            left: drawerWidth,
+            left: 0, // Extend to the very left
             right: 0,
+            width: '100vw', // Ensure full viewport width
             zIndex: (theme) => theme.zIndex.drawer - 1
           }}
         >
-          <Typography variant="body2" color="text.secondary">
-            © {new Date().getFullYear()} Signal Snapshot · 
-            <a 
-              href="https://github.com/ahstew/signal-snapshot" 
-              target="_blank" 
-              rel="noopener noreferrer"
-              style={{ color: 'inherit', margin: '0 8px' }}
-            >
-              GitHub
-            </a>
-            ·
-            <a 
-              href="mailto:support@signalsnapshot.com" 
-              style={{ color: 'inherit', marginLeft: '8px' }}
-            >
-              support@signalsnapshot.com
-            </a>
-          </Typography>
+          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', py: 1 }}>
+            <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center' }}>
+              <a 
+                href="https://github.com/ahstewart/signal-snapshot" 
+                target="_blank" 
+                rel="noopener noreferrer"
+                style={{ color: 'inherit', margin: '0 8px', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+              >
+                <img src="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" alt="GitHub" style={{ width: 20, height: 20, marginRight: 6, verticalAlign: 'middle' }} />
+                GitHub
+              </a>
+              ·
+              <a 
+                href="mailto:support@signalsnapshot.com" 
+                style={{ color: 'inherit', marginLeft: '8px' }}
+              >
+                support@signalsnapshot.com
+              </a>
+            </Typography>
+          </Box>
         </Box>
       </Box>
     </Box>

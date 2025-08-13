@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import Home from './components/Home';
 import { Box, CircularProgress } from '@mui/material';
 import ProgressDialog from './components/ProgressDialog';
 import Dashboard from './components/Dashboard';
 import IndividualStats from './components/IndividualStats';
 import SummaryPage from './components/SummaryPage';
 import OneOnOnesPage from './components/OneOnOnesPage';
-import LandingPage from './pages/LandingPage';
 import AppLayout from './components/layout/AppLayout';
 import './App.css';
 import { AnalyticsData, IndividualStatsData, loadDatabase, loadIndividualStats, loadUsers, User } from './utils/database';
@@ -228,7 +228,7 @@ function App() {
             {progressDialog}
             <Routes>
                 {/* Public routes */}
-                <Route path="/" element={<LandingPage />} />
+                <Route path="/" element={<Home />} />
                 
                 {/* App routes */}
                 <Route 
