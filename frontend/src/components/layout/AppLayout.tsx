@@ -405,32 +405,36 @@ const AppLayout: React.FC<AppLayoutProps> = ({
           sx={{
             borderTop: 1,
             borderColor: 'divider',
-            backgroundColor: 'background.paper',
+            backgroundColor: '#f0f4ff',
             position: 'fixed',
             bottom: 0,
-            left: 0, // Extend to the very left
+            left: drawerWidth,
             right: 0,
-            zIndex: (theme) => theme.zIndex.drawer - 1
+            height: '20px',
+            zIndex: (theme) => theme.zIndex.drawer - 1,
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: '12px 0',
           }}
         >
-          <Typography variant="body2" color="text.secondary">
-            © {new Date().getFullYear()} Signal Snapshot · 
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, marginRight: '270px' }}>
             <a 
               href="https://github.com/ahstew/signal-snapshot" 
               target="_blank" 
               rel="noopener noreferrer"
-              style={{ color: 'inherit', margin: '0 8px' }}
+              style={{ color: 'inherit', display: 'flex', alignItems: 'center' }}
             >
-              GitHub
+              <GitHubIcon fontSize="small" sx={{ mr: .5 }} /> GitHub
             </a>
             ·
             <a 
-              href="mailto:support@signalsnapshot.com" 
-              style={{ color: 'inherit', marginLeft: '8px' }}
+              href="mailto:hank@signalsnapshot.com" 
+              style={{ color: 'inherit', marginLeft: '5px' }}
             >
-              support@signalsnapshot.com
+              hank@signalsnapshot.com
             </a>
-          </Typography>
+          </Box>
         </Box>
       </Box>
     </Box>

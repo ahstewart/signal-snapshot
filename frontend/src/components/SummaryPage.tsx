@@ -1,7 +1,9 @@
-import React from 'react';
-import { Box, Typography, Paper, CircularProgress, Alert, Grid, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from '@mui/material';
+import React, { useState } from 'react';
+import { Box, Typography, Paper, CircularProgress, Alert, Grid, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Button, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
+import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import { AnalyticsData, User, UserActivity } from '../utils/database';
 import { PageHeader } from './PageHeader';
+import { theme } from '../theme/theme';
 
 interface SummaryPageProps {
     data: AnalyticsData | null;
@@ -11,6 +13,15 @@ interface SummaryPageProps {
 }
 
 const SummaryPage: React.FC<SummaryPageProps> = ({ data, loading, error, users }) => {
+    const [helpOpen, setHelpOpen] = useState(false);
+
+    const handleHelpOpen = () => {
+        setHelpOpen(true);
+    };
+
+    const handleHelpClose = () => {
+        setHelpOpen(false);
+    };
     function renderTopUsersTable(title: string, data: UserActivity[], countLabel: string) {
     if (!data || data.length === 0) return null;
 
@@ -72,7 +83,7 @@ const SummaryPage: React.FC<SummaryPageProps> = ({ data, loading, error, users }
                     {error}
                 </Alert>
             )}
-            {!loading && !error && data && (
+            {!loading && !error && data ? (
                 <>
                     <Grid container spacing={3} sx={{ mb: 4 }}>
                         {renderKpiCard('Total Messages', data.kpis.total_messages)}
@@ -123,7 +134,7 @@ const SummaryPage: React.FC<SummaryPageProps> = ({ data, loading, error, users }
                         </Grid>
                     </Grid>
                 </>
-            )}
+            ) : null}
         </Box>
     );
 };

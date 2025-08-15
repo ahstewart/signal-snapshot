@@ -93,7 +93,7 @@ export const theme = createTheme({
     },
     background: {
       default: '#f8f9fa',
-      paper: '#fff'
+      paper: '#fff',
     },
     text: {
       primary: '#212529',
