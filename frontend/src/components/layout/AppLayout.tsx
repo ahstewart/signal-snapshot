@@ -30,6 +30,7 @@ import SummarizeIcon from '@mui/icons-material/Summarize';
 import ChatIcon from '@mui/icons-material/Chat';
 import HomeIcon from '@mui/icons-material/Home';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
+import GitHubIcon from '@mui/icons-material/GitHub';
 
 interface AppLayoutProps {
   dbBuffer: ArrayBuffer | null;
@@ -163,7 +164,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({
                   fontWeight: 500
                 }}
               >
-                Change Database
+                Change Data Source
               </Button>
             </>
           )}
@@ -302,9 +303,24 @@ const AppLayout: React.FC<AppLayoutProps> = ({
                         How do I do this?
                 </Button>
                 {/* Help Dialog */}
-                <Dialog open={helpOpen} onClose={handleHelpClose} maxWidth="md" fullWidth>
-                  <DialogTitle>How to upload your Signal data</DialogTitle>
-                  <DialogContent>
+                <Dialog 
+                  open={helpOpen} 
+                  onClose={handleHelpClose} 
+                  maxWidth="md" 
+                  fullWidth
+                  sx={{ 
+                    '& .MuiDialog-paper': { 
+                      width: '800px', 
+                      maxWidth: '90vw',
+                      height: '600px',
+                      maxHeight: '90vh',
+                      display: 'flex',
+                      flexDirection: 'column'
+                    } 
+                  }}
+                >
+                  <DialogTitle sx={{ flexShrink: 0 }}>Uploading Your Signal Data</DialogTitle>
+                  <DialogContent sx={{ flex: '1 1 auto', overflowY: 'auto' }}>
                     <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
                       <Tabs value={currentTab} onChange={handleTabChange} aria-label="signal platform tabs">
                         <Tab label="Signal Desktop" {...a11yProps(0)} />
@@ -336,8 +352,25 @@ const AppLayout: React.FC<AppLayoutProps> = ({
                         <Typography component="li" variant="body1">
                           <strong>Decrypt your Signal database</strong>
                           <Typography component="div" variant="body2" sx={{ mt: 1, pl: 2 }}>
-                            The database is encrypted. You'll need to use the Signal Decrypt tool to decrypt it before uploading.
+                            This is the hard part. The database is encrypted (which, since you're a Signal user, is a good thing). But 
+                            it means to visualize your data, you'll need to decrypt it. Regardless of your
+                            operating system, the decryption process will be made up of two tasks: 
+                            <strong> decrypting the key</strong> and
+                            <strong> decrypting the database.</strong>
                           </Typography>
+                          <Typography component="div" variant="body2" sx={{ mt: 1, pl: 2 }}>
+                            There are a few resources online that detail this if you want to give it a go yourself. You can also try to have your favorite LLM write a script for it.
+                          </Typography>
+                          <Typography component="div" variant="body2" sx={{ mt: 1, pl: 2 }}>
+                            I'm working on adding a simple downloadable program that handles all of this for you. Stay tuned.
+                          </Typography>
+                      {/*   <Typography variant="caption" display="block" sx={{ mt: 1, fontStyle: 'italic' }}>
+                            Note: You can use the{' '}
+                            <a href="https://github.com/ahstew/signal-snapshot" target="_blank" rel="noopener noreferrer" style={{ color: 'inherit' }}>
+                              Signal Snapshot
+                            </a>{' '}
+                            tool to decrypt your database.
+                          </Typography> */}
                         </Typography>
                       </Box>
                     </TabPanel>
@@ -347,9 +380,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({
                         Signal Snapshot doesn't yet support Android devices.
                       </DialogContentText>
                       <Typography variant="body2" color="text.secondary">
+                        <br/>
                         If you'd like Android support, send an email over to{' '}
-                        <a href="mailto:support@signalsnapshot.com" style={{ color: 'inherit' }}>support@signalsnapshot.com</a>
-                        {' '}and let us know you're interested.
+                        <a href="mailto:hank@signalsnapshot.com" style={{ color: 'inherit' }}>hank@signalsnapshot.com</a>
+                        {' '}and let me know you're interested. Pull requests are also welcome!
                       </Typography>
                     </TabPanel>
                     
@@ -358,9 +392,10 @@ const AppLayout: React.FC<AppLayoutProps> = ({
                         Signal Snapshot doesn't yet support iOS devices.
                       </DialogContentText>
                       <Typography variant="body2" color="text.secondary">
+                        <br/>
                         If you'd like iOS support, send an email over to{' '}
-                        <a href="mailto:support@signalsnapshot.com" style={{ color: 'inherit' }}>support@signalsnapshot.com</a>
-                        {' '}and let us know you're interested.
+                        <a href="mailto:hank@signalsnapshot.com" style={{ color: 'inherit' }}>hank@signalsnapshot.com</a>
+                        {' '}and let me know you're interested. Pull requests are also welcome!
                       </Typography>
                     </TabPanel>
                   </DialogContent>
@@ -393,27 +428,29 @@ const AppLayout: React.FC<AppLayoutProps> = ({
             bottom: 0,
             left: drawerWidth,
             right: 0,
-            zIndex: (theme) => theme.zIndex.drawer - 1
+            zIndex: (theme) => theme.zIndex.drawer - 1,
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center'
           }}
         >
-          <Typography variant="body2" color="text.secondary">
-            © {new Date().getFullYear()} Signal Snapshot · 
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, marginRight: '270px' }}>
             <a 
               href="https://github.com/ahstew/signal-snapshot" 
               target="_blank" 
               rel="noopener noreferrer"
-              style={{ color: 'inherit', margin: '0 8px' }}
+              style={{ color: 'inherit', display: 'flex', alignItems: 'center' }}
             >
-              GitHub
+              <GitHubIcon fontSize="small" sx={{ mr: .5 }} /> GitHub
             </a>
             ·
             <a 
-              href="mailto:support@signalsnapshot.com" 
-              style={{ color: 'inherit', marginLeft: '8px' }}
+              href="mailto:hank@signalsnapshot.com" 
+              style={{ color: 'inherit', marginLeft: '5px' }}
             >
-              support@signalsnapshot.com
+              hank@signalsnapshot.com
             </a>
-          </Typography>
+          </Box>
         </Box>
       </Box>
     </Box>
