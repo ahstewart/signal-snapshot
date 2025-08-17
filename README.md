@@ -1,47 +1,42 @@
 # Signal Chat Analytics Dashboard
 
-A web application that analyzes Signal chat data and provides a comprehensive dashboard for users to explore their messaging patterns.
+A privacy-focused, client-side web application that analyzes your Signal Desktop chat history directly in your browser.
 
 ## Features
 
-- Upload Signal chat data (SQLite database or CSV backup)
-- Generate detailed analytics about your messaging patterns
-- Visualize message volume by time
-- Identify top contacts and conversation patterns
-- Share your analytics dashboard with others
+- **100% Client-Side Processing**: Your data never leaves your computer
+- **Secure**: All processing happens in your browser - no server-side processing
+- **No Installation Required**: Just open the app in your web browser
+- **Detailed Analytics**: Visualize your messaging patterns and statistics
 
-## Setup
+## How to Use
 
-1. Create a virtual environment and activate it:
-```bash
-python -m venv venv
-venv\Scripts\activate
-```
+1. **Prepare Your Signal Data**:
+   - Locate your Signal Desktop database file (typically at `%APPDATA%\Signal\sql\db.sqlite` on Windows)
+   - Decrypt the database using Signal's built-in export feature
 
-2. Install dependencies:
-```bash
-pip install -r requirements.txt
-```
+2. **Open the App**:
+   - Simply open `index.html` in your web browser or host it on a web server
+   - No server setup or installation required
 
-3. Run the development server:
-```bash
-uvicorn app.main:app --reload
-```
+3. **Upload and Analyze**:
+   - Click "Upload" and select your decrypted Signal SQLite database file
+   - View your chat analytics immediately in your browser
 
-The server will start at `http://localhost:8000`
+## Privacy and Security
 
-## Data Import
+- **No Data Leaves Your Computer**: All processing happens directly in your web browser
+- **No Server Required**: The app runs entirely in the browser with no backend server
+- **No Tracking**: We don't use any analytics or tracking services
+- **Temporary Storage**: Your data is only stored in your browser's memory and is cleared when you close the tab
 
-The application supports two types of data input:
+## Supported Data Format
 
-1. **Signal Desktop SQLite Database**
-   - Located at `%APPDATA%\Signal\data.sqlite` on Windows
-   - Requires SQLCipher encryption key
+This application currently supports:
+- Decrypted Signal Desktop SQLite database files (`.sqlite`)
 
-2. **Signal Android CSV Backup**
-   - Created through Signal Android's backup feature
-   - Converted to CSV format
+## Technical Details
 
-## Security Note
-
-This application does not store any user data. All processing is done locally on the user's device. Signal's end-to-end encryption remains intact as we only analyze data that has been exported by the user.
+- Built with React and TypeScript
+- Uses SQL.js for in-browser SQLite processing
+- Responsive design works on desktop and tablet devices

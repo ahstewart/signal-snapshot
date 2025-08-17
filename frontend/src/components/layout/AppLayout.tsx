@@ -420,7 +420,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({
         >
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, marginRight: '270px' }}>
             <a 
-              href="https://github.com/ahstew/signal-snapshot" 
+              href="https://github.com/ahstewart/signal-snapshot" 
               target="_blank" 
               rel="noopener noreferrer"
               style={{ color: 'inherit', display: 'flex', alignItems: 'center' }}
