@@ -44,17 +44,34 @@ const Home: React.FC = () => {
           Signal Snapshot
         </Typography>
         <Typography variant="h5" sx={{ mb: 4, color: '#0057b8', fontWeight: 500 }}>
-          Gain fun and interesting insights into your Signal conversations
+          Visualize your Signal conversations in a whole different light
         </Typography>
         <Typography variant="h6" sx={{ mb: 3, fontWeight: 500, color: '#0099ff' }}>
           A simple, lightweight tool for Signal users
         </Typography>
-        <Typography paragraph sx={{ fontSize: '1.1rem', mb: 3, color: '#222' }}>
-          Signal Snapshot provides you with detailed analytics and visualizations of your Signal conversations, helping you understand your messaging patterns, engagement, and more. There’s no account, no server, and no hidden tricks—just a static app that runs entirely in your browser.
-        </Typography>
-        <Typography paragraph sx={{ fontSize: '1.1rem', mb: 4, color: '#222' }}>
-          <strong style={{ color: '#0057b8' }}>Your privacy is our priority:</strong> This app never stores, uploads, or shares your data. Everything happens locally on your computer, and your information never leaves your device.
-        </Typography>
+        <Box sx={{ textAlign: 'left', mb: 4 }}>
+          <Typography variant="h6" sx={{ color: '#0057b8', fontWeight: 600, mt: 3, mb: 1 }}>
+            What is it?
+          </Typography>
+          <Typography paragraph sx={{ fontSize: '1.1rem', mb: 3, color: '#222', pl: 2 }}>
+            A simple web app that helps you see analytics and trends for your Signal conversations. Understand your messaging patterns, engagement levels, and communication habits—all while keeping your data private.
+          </Typography>
+
+          <Typography variant="h6" sx={{ color: '#0057b8', fontWeight: 600, mt: 4, mb: 1 }}>
+            How does it work?
+          </Typography>
+          <Typography paragraph sx={{ fontSize: '1.1rem', mb: 3, color: '#222', pl: 2 }}>
+            Signal's core tenet is privacy, so getting your data into a web app is intentionally tricky. To make this possible, while keeping true to Signal's roots, the app requires you to find and upload your Signal data. Click here for a guide on how to do this. Once it's uploaded to the page, built-in data analytics functions parse the data and create visualizations personalized to you.
+          </Typography>
+
+          <Typography variant="h6" sx={{ color: '#0057b8', fontWeight: 600, mt: 4, mb: 1 }}>
+            Is it secure?
+          </Typography>
+          <Typography paragraph sx={{ fontSize: '1.1rem', mb: 2, color: '#222', pl: 2 }}>
+            <strong>Absolutely.</strong> This app runs entirely in your browser—your data never leaves your device. No accounts, no servers, no data collection. Want to make sure? Press F12 while using the app and monitor the network tab. 
+            You'll notice that no requests are being made to any servers. This app's code is also open source, feel free to check it out on GitHub.
+          </Typography>
+        </Box>
         <Box sx={{ display: 'flex', justifyContent: 'center', mb: 4 }}>
           <Button
             variant="contained"
@@ -77,7 +94,7 @@ const Home: React.FC = () => {
             }}
             onClick={() => navigate('/app/summary')}
           >
-            Launch App
+            Create Your Snapshot
           </Button>
         </Box>
         <Typography variant="body2" sx={{ fontSize: isMobile ? '0.95rem' : '1rem', mt: 2, color: '#0057b8' }}>
