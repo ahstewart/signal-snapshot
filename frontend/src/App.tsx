@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import Home from './components/Home';
 import { Box, CircularProgress } from '@mui/material';
 import ProgressDialog from './components/ProgressDialog';
@@ -10,6 +10,7 @@ import OneOnOnesPage from './components/OneOnOnesPage';
 import AppLayout from './components/layout/AppLayout';
 import './App.css';
 import { AnalyticsData, IndividualStatsData, loadDatabase, loadIndividualStats, loadUsers, User } from './utils/database';
+import * as gtag from './gtag';
 
 function App() {
     // Shared state
@@ -39,6 +40,7 @@ function App() {
     const [originalAnalyticsData, setOriginalAnalyticsData] = useState<AnalyticsData | null>(null);
 
     const navigate = useNavigate();
+    const location = useLocation();
 
     // Handlers
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
@@ -220,6 +222,11 @@ function App() {
             title="Processing Database"
         />
     ), [showProgress, progress, progressMessage]);
+
+    // send a pageview to GA when the route changes
+    useEffect(() => {
+        gtag.pageview(location.pathname + location.search);
+    }, [location]);
 
     const drawerWidth = 240;
 
