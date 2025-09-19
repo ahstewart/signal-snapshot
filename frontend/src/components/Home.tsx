@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Box, Typography, Button, useTheme, useMediaQuery, Grid } from '@mui/material';
+import { AppBar, Toolbar, Typography, Box, Button, useTheme, useMediaQuery } from '@mui/material';
 
 const Home: React.FC = () => {
   const theme = useTheme();
@@ -8,14 +8,37 @@ const Home: React.FC = () => {
   const navigate = useNavigate();
 
   return (
-    <Box sx={{
-      minHeight: '100vh',
-      bgcolor: '#002b5c', // Signal dark blue
-      background: 'linear-gradient(135deg, #003366 0%, #0057b8 100%)',
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'center',
-    }}>
+    <Box sx={{ minHeight: '100vh', bgcolor: '#002b5c', background: 'linear-gradient(135deg, #003366 0%, #0057b8 100%)' }}>
+      {/* Site Header */}
+      <AppBar
+        position="fixed"
+        color="primary"
+        sx={{
+          zIndex: (theme) => theme.zIndex.drawer + 1,
+        }}
+      >
+        <Toolbar>
+          <Typography
+            variant="h6"
+            component="div"
+            sx={{
+              fontWeight: 'bold',
+              color: 'inherit',
+              textDecoration: 'none',
+              mr: 3,
+              letterSpacing: 1,
+              '&:hover': {
+                textDecoration: 'none',
+                cursor: 'pointer',
+                opacity: 0.9
+              }
+            }}
+          >
+            Signal Snapshot
+          </Typography>
+        </Toolbar>
+      </AppBar>
+      {/* Main Content */}
       <Box
         sx={{
           maxWidth: 800,
@@ -26,6 +49,7 @@ const Home: React.FC = () => {
           borderRadius: 4,
           boxShadow: 6,
           background: 'rgba(255,255,255,0.95)',
+          mt: 10, // add margin to account for fixed AppBar
         }}
       >
         <Typography

@@ -22,7 +22,8 @@ import {
   DialogActions,
   Tabs,
   Tab,
-  Box as MuiBox
+  Box as MuiBox,
+  IconButton
 } from '@mui/material';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import PersonIcon from '@mui/icons-material/Person';
@@ -31,6 +32,7 @@ import ChatIcon from '@mui/icons-material/Chat';
 import HomeIcon from '@mui/icons-material/Home';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import GitHubIcon from '@mui/icons-material/GitHub';
+import CloseIcon from '@mui/icons-material/Close';
 
 interface AppLayoutProps {
   dbBuffer: ArrayBuffer | null;
@@ -39,6 +41,8 @@ interface AppLayoutProps {
   error: string | null;
   loading: boolean;
   children?: React.ReactNode;
+  showWelcome: boolean;
+  onCloseWelcome: () => void;
 }
 
 const drawerWidth = 240;
@@ -49,11 +53,18 @@ const AppLayout: React.FC<AppLayoutProps> = ({
   onFileChange,
   error,
   loading,
-  children
+  children,
+  showWelcome,
+  onCloseWelcome,
 }) => {
   const location = useLocation();
   const [helpOpen, setHelpOpen] = useState(false);
   const [currentTab, setCurrentTab] = useState(0);
+  const [welcomeOpen, setWelcomeOpen] = useState(showWelcome);
+
+  React.useEffect(() => {
+    setWelcomeOpen(showWelcome);
+  }, [showWelcome]);
 
   const handleHelpOpen = () => {
     setHelpOpen(true);
@@ -65,6 +76,12 @@ const AppLayout: React.FC<AppLayoutProps> = ({
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setCurrentTab(newValue);
+  };
+
+  const handleWelcomeOpen = () => setWelcomeOpen(true);
+  const handleWelcomeClose = () => {
+    setWelcomeOpen(false);
+    onCloseWelcome();
   };
 
   function a11yProps(index: number) {
@@ -117,9 +134,11 @@ const AppLayout: React.FC<AppLayoutProps> = ({
           >
             Signal Snapshot
           </Typography>
-          
           <Box sx={{ flexGrow: 1 }} />
-          
+          {/* Help Icon */}
+          <IconButton color="inherit" onClick={handleWelcomeOpen} aria-label="About Signal Snapshot" sx={{ mr: 1 }}>
+            <HelpOutlineIcon />
+          </IconButton>
           {dbBuffer && (
             <>
               <Typography 
@@ -171,6 +190,164 @@ const AppLayout: React.FC<AppLayoutProps> = ({
         </Toolbar>
       </AppBar>
       
+      {/* Welcome Dialog */}
+      <Dialog
+        open={welcomeOpen}
+        onClose={handleWelcomeClose}
+        maxWidth={false}
+        fullWidth
+        PaperProps={{
+          sx: {
+            width: { xs: '100vw', sm: '100vw', md: '100vw', lg: '97vw' },
+            height: { xs: '100vh', sm: '100vh', md: '100vh', lg: '97vh' },
+            maxWidth: 'none',
+            maxHeight: 'none',
+            m: 0,
+            borderRadius: 4,
+            display: 'flex',
+            flexDirection: 'column'
+          }
+        }}
+      >
+        <DialogContent
+          dividers
+          sx={{
+            position: 'relative',
+            pt: 3,
+            background: 'linear-gradient(135deg, #eaf3fb 0%, #d6e7fa 100%)',
+            flex: 1,
+            minHeight: 0,
+            overflowY: 'auto'
+          }}
+        >
+          {/* Close button in the top-right corner, absolutely positioned */}
+          <IconButton
+            onClick={handleWelcomeClose}
+            size="small"
+            aria-label="Close"
+            sx={{
+              position: 'absolute',
+              top: 8,
+              right: 8,
+              zIndex: 1,
+            }}
+          >
+            <CloseIcon />
+          </IconButton>
+          {/* Branding and subtitle at the top */}
+          <Box sx={{ maxWidth: 900, mx: 'auto', textAlign: 'center', mb: 3 }}>
+            <Typography
+              variant="h3"
+              component="h1"
+              sx={{
+                fontWeight: 'bold',
+                background: 'linear-gradient(135deg, #0099ff 0%, #0057b8 100%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                mb: 2,
+                fontSize: { xs: '2.5rem', sm: '3.5rem', md: '3rem' },
+                letterSpacing: 1,
+              }}
+            >
+              Signal Snapshot
+            </Typography>
+            <Typography variant="h5" sx={{ mb: 2, color: '#0057b8', fontWeight: 500 }}>
+              Visualize your Signal conversations in a whole different light
+            </Typography>
+          </Box>
+          {/* Centered Create Snapshot button above the containers */}
+          <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4, mb: 4 }}>
+            <Button
+              variant="contained"
+              color="primary"
+              size="large"
+              sx={{
+                px: 10,
+                py: 2,
+                fontSize: '1.15rem',
+                fontWeight: 600,
+                borderRadius: 3,
+                boxShadow: 2,
+                textTransform: 'none'
+              }}
+              onClick={handleWelcomeClose}
+            >
+              Create Snapshot
+            </Button>
+          </Box>
+          <Box
+            sx={{
+              maxWidth: 1200,
+              mx: 'auto',
+              py: 2,
+              px: 1,
+              textAlign: 'center',
+              display: 'flex',
+              flexDirection: { xs: 'column', md: 'row' },
+              gap: 3,
+              alignItems: 'stretch',
+              justifyContent: 'center',
+            }}
+          >
+            {/* All containers use the same color */}
+            {[
+              {
+                title: "What is it?",
+                content: "A web tool that generates custom data visualizations from your Signal conversations. If it helps, think of it as a kind of \"Spotify Wrapped\" for Signal."
+              },
+              {
+                title: "How does it work?",
+                content: "Signal's core tenet is privacy, so getting your data into a web app is intentionally tricky. To keep true to Signal's roots, the app requires you to find and upload your Signal data. Once it's uploaded to the page, the application uses this data to create personalized analytics."
+              },
+              {
+                title: "Is it secure?",
+                content: `<strong>Absolutely.</strong> This app runs entirely in your browser—your data never leaves your device. Want to make sure? Press F12 while using the app and monitor the network tab. You'll notice that no requests are being made. This app's code is also open source, feel free to <a href="https://github.com/ahstewart/signal-snapshot" target="_blank" rel="noopener noreferrer">check it out on GitHub</a>.`
+              }
+            ].map((section, idx) => (
+              <Box
+                key={section.title}
+                sx={{
+                  flex: 1,
+                  minWidth: 0,
+                  bgcolor: '#fafdff', // unified very light blue/white for all
+                  borderRadius: 4,
+                  boxShadow: 2,
+                  p: { xs: 2, md: 3 },
+                  display: 'flex',
+                  flexDirection: 'column',
+                  alignItems: 'center',
+                  mb: { xs: 2, md: 0 },
+                }}
+              >
+                <Typography variant="h6" sx={{ color: '#0057b8', fontWeight: 600, mt: 1, mb: 1 }}>
+                  {section.title}
+                </Typography>
+                <Typography
+                  paragraph
+                  sx={{
+                    fontSize: '0.95rem',
+                    mb: 2,
+                    color: '#222',
+                    pl: 2,
+                    textAlign: 'left',
+                  }}
+                  // For the "Is it secure?" section, allow HTML for <strong>
+                  dangerouslySetInnerHTML={idx === 2 ? { __html: section.content } : undefined}
+                >
+                  {idx !== 2 ? section.content : undefined}
+                </Typography>
+              </Box>
+            ))}
+          </Box>
+          {/* Move the privacy text below the containers */}
+          <Box sx={{ maxWidth: 900, mx: 'auto', textAlign: 'center', mt: 3 }}>
+            <Typography variant="body2" sx={{ fontSize: { xs: '0.95rem', sm: '1rem' }, color: '#0057b8' }}>
+              Your data stays on your device. We don't store or process your messages on any server.
+            </Typography>
+          </Box>
+        </DialogContent>
+        {/* No DialogActions */}
+      </Dialog>
       {/* Sidebar Navigation */}
       <Drawer
         variant="permanent"
@@ -326,7 +503,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({
                           <Typography component="div" variant="body2" sx={{ mt: 1, pl: 2 }}>
                             Your database is located at:
                             <Box component="ul" sx={{ pl: 2, mt: 1, '& > li': { mb: 0.5 } }}>
-                              <li><strong>Windows:</strong> <code>AppData\Signal\sql\db.sqlite</code></li>
+                              <li><strong>Windows:</strong> <code>AppData\Roaming\Signal\sql\db.sqlite</code></li>
                               <li><strong>macOS:</strong> <code>~/Library/Application Support/Signal/sql/db.sqlite</code></li>
                               <li><strong>Linux:</strong> <code>~/.config/Signal/sql/db.sqlite</code></li>
                             </Box>
@@ -340,16 +517,36 @@ const AppLayout: React.FC<AppLayoutProps> = ({
                           <strong>Decrypt your Signal database</strong>
                           <Typography component="div" variant="body2" sx={{ mt: 1, pl: 2 }}>
                             This is the hard part. The database is encrypted (which, since you're a Signal user, is a good thing). But 
-                            it means to visualize your data, you'll need to decrypt it. Regardless of your
+                            it means that to visualize your data, you'll need to decrypt it. Regardless of your
                             operating system, the decryption process will be made up of two tasks: 
                             <strong> decrypting the key</strong> and
                             <strong> decrypting the database.</strong>
                           </Typography>
                           <Typography component="div" variant="body2" sx={{ mt: 1, pl: 2 }}>
-                            There are a few resources online that detail this if you want to give it a go yourself. You can also try to have your favorite LLM write a script for it.
+                            To make this process easier, you can use <a href="https://github.com/ahstewart/signal-decrypt" target="_blank" rel="noopener noreferrer">this Signal Decrypt tool</a>. It's a simple C# program that will automatically decrypt your key, then output a decrypted copy of your database. Click a link below to download this program, then simply double click the file to run it:
+                            <ul style={{ marginTop: 8, marginBottom: 8 }}>
+                              <li>
+                                <a href={`${process.env.PUBLIC_URL}/decrypt/win-64/signal-decrypt.exe`} download>
+                                  Download for Windows 64-bit (.exe)
+                                </a>
+                              </li>
+                              <li>
+                                <a href={`${process.env.PUBLIC_URL}/decrypt/osx-64/signal-decrypt`} download>
+                                  Download for macOS 64-bit (.zip)
+                                </a>
+                              </li>
+                              <li>
+                                <a href={`${process.env.PUBLIC_URL}/decrypt/linux-64/signal-decrypt`} download>
+                                  Download for Linux 64-bit (.tar.gz)
+                                </a>
+                              </li>
+                            </ul>
                           </Typography>
                           <Typography component="div" variant="body2" sx={{ mt: 1, pl: 2 }}>
-                            I'm working on adding a simple downloadable program that handles all of this for you. Stay tuned.
+                            <strong>The database created by this tool can be directly uploaded into Signal Snapshot.</strong>
+                          </Typography>
+                          <Typography component="div" variant="body2" sx={{ mt: 1, pl: 2 }}>
+                            If you'd like to try doing the decryption yourself, there are a few resources online that detail the process. You can also try to have your favorite LLM write a script for it if you're especially brave.
                           </Typography>
                       {/*   <Typography variant="caption" display="block" sx={{ mt: 1, fontStyle: 'italic' }}>
                             Note: You can use the{' '}

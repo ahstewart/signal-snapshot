@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
-import Home from './components/Home';
 import { Box, CircularProgress } from '@mui/material';
 import ProgressDialog from './components/ProgressDialog';
 import Dashboard from './components/Dashboard';
@@ -34,6 +33,7 @@ function App() {
     const [selectedUser, setSelectedUser] = useState<string>('');
     const [statsData, setStatsData] = useState<IndividualStatsData | null>(null);
     const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
+    const [showWelcome, setShowWelcome] = useState(true);
 
     // For SummaryPage, always pass the original, unfiltered analyticsData
     // Store the original analyticsData when loaded
@@ -41,6 +41,13 @@ function App() {
 
     const navigate = useNavigate();
     const location = useLocation();
+
+    // Show welcome dialog only on first load to /app/summary or "/"
+    useEffect(() => {
+        if (location.pathname === '/' || location.pathname === '/app' || location.pathname === '/app/') {
+            setShowWelcome(true);
+        }
+    }, [location.pathname]);
 
     // Handlers
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>): Promise<void> => {
@@ -234,9 +241,9 @@ function App() {
         <>
             {progressDialog}
             <Routes>
-                {/* Public routes */}
-                <Route path="/" element={<Home />} />
-                
+                {/* Redirect "/" and "/app" to summary, show welcome */}
+                <Route path="/" element={<Navigate to="/app/summary" replace />} />
+                <Route path="/app" element={<Navigate to="/app/summary" replace />} />
                 {/* App routes */}
                 <Route 
                     path="/app"
@@ -247,6 +254,8 @@ function App() {
                             onFileChange={handleFileChange}
                             error={error}
                             loading={loading}
+                            showWelcome={showWelcome}
+                            onCloseWelcome={() => setShowWelcome(false)}
                         />
                     }
                 >
@@ -315,9 +324,8 @@ function App() {
                         }
                     />
                 </Route>
-                
-                {/* Redirect all other routes to home */}
-                <Route path="*" element={<Navigate to="/" replace />} />
+                {/* Redirect all other routes to summary */}
+                <Route path="*" element={<Navigate to="/app/summary" replace />} />
             </Routes>
         </>
     );
