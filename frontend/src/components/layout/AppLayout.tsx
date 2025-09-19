@@ -418,7 +418,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({
             padding: '12px 0',
           }}
         >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, marginRight: '270px' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, marginRight: '265px' }}>
             <a 
               href="https://github.com/ahstewart/signal-snapshot" 
               target="_blank" 

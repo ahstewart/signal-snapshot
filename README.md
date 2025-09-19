@@ -6,7 +6,7 @@ A privacy-focused, client-side web application that analyzes your Signal Desktop
 
 - **100% Client-Side Processing**: Your data never leaves your computer
 - **Secure**: All processing happens in your browser - no server-side processing
-- **No Installation Required**: Just open the app in your web browser
+- **No Installation Required**: Just open the app in your web browser at www.signalsnapshot.com
 - **Detailed Analytics**: Visualize your messaging patterns and statistics
 
 ## How to Use
