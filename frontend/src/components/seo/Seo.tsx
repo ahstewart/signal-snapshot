@@ -9,8 +9,8 @@ interface SeoProps {
 }
 
 export const Seo = ({
-  title = 'Signal Snapshot - Private Signal Chat Analytics',
-  description = 'Analyze your Signal chat history privately in your browser. No data leaves your computer.',
+  title = 'Signal Snapshot - Visualize Your Signal Message History',
+  description = 'Create personalized visualizations of your Signal conversations, all within in your browser.',
   image = '/social-preview.png',
   url = 'https://signalsnapshot.com',
   type = 'website',
