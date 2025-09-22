@@ -11,7 +11,7 @@ interface SeoProps {
 export const Seo = ({
   title = 'Signal Snapshot - Visualize Your Signal Message History',
   description = 'Create personalized visualizations of your Signal conversations, all within in your browser.',
-  image = '/social-preview.png',
+  image = "%PUBLIC_URL%/favicon.ico",
   url = 'https://signalsnapshot.com',
   type = 'website',
 }: SeoProps) => {
