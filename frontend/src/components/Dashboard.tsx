@@ -1,20 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React from 'react';
 
 import {
   Alert,
   Box,
-  Button,
-  Checkbox,
-  Chip,
   CircularProgress,
-  FormControl,
   Grid,
-  InputLabel,
-  ListItemText,
-  MenuItem,
   Paper,
-  Select,
-  SelectChangeEvent,
   Table,
   TableBody,
   TableCell,
@@ -22,6 +13,7 @@ import {
   TableHead,
   TableRow,
   Typography,
+  Chip,
 } from '@mui/material';
 import {
   ResponsiveContainer,
@@ -33,25 +25,18 @@ import {
   Tooltip,
 } from 'recharts';
 import { Autocomplete, TextField } from '@mui/material';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'; // Import the icon
 
-import { loadDatabase, Conversation, AnalyticsData, EmotionUserData, User } from '../utils/database';
+import { AnalyticsData, Conversation, User } from '../utils/database';
 import { PageHeader } from './PageHeader';
 
-// -----------------------------------------------------------------------------
-// Types
-// -----------------------------------------------------------------------------
-type EmojiCount = { emoji: string; count: number };
-
-// -----------------------------------------------------------------------------
-// Component
-// -----------------------------------------------------------------------------
 interface DashboardProps {
-  data: AnalyticsData | null; // Changed from any to AnalyticsData | null
+  data: AnalyticsData | null;
   loading: boolean;
   error: string | null;
   selectedConversationIds: string[];
   onConversationSelect: React.Dispatch<React.SetStateAction<string[]>>;
-  users: User[]; // Changed from any[] to User[]
+  users: User[];
   selectedUser: string;
   onUserSelect: (user: string) => void;
 }
@@ -63,21 +48,15 @@ const Dashboard: React.FC<DashboardProps> = ({
   selectedConversationIds, 
   onConversationSelect,
   users,
-  selectedUser,
-  onUserSelect
 }: DashboardProps) => {
   const handleConversationChange = (event: any, value: string | null) => {
     onConversationSelect(value ? [value] : []);
   };
 
-  // ---------------------------------------------------------------------------
-  // Helpers
-  // ---------------------------------------------------------------------------
   function formatHour(hour: number): string {
     return `${hour}:00`;
   }
 
-  // Create a map of user IDs to names
   const userNameMap = React.useMemo(() => {
     const map: Record<string, string> = {};
     users.forEach(user => {
@@ -86,20 +65,12 @@ const Dashboard: React.FC<DashboardProps> = ({
     return map;
   }, [users]);
 
-  // Helper function to get user name by ID
   const getUserName = (id: string): string => {
     return userNameMap[id] || id;
   };
   
-  // Use the data prop as analyticsData for backward compatibility
   const analyticsData = data;
 
-  // Helper function to safely access analyticsData properties
-  const getAnalyticsData = <T,>(getter: (data: AnalyticsData) => T, defaultValue: T): T => {
-    return analyticsData ? getter(analyticsData) : defaultValue;
-  };
-
-  // Early return if no data is available
   if (loading) {
     return (
       <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
@@ -124,33 +95,60 @@ const Dashboard: React.FC<DashboardProps> = ({
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Render helpers
-  // ---------------------------------------------------------------------------
+  // --- NEW: AI Summary Widget ---
   function renderConversationSummary() {
+    // Only show if exactly one conversation is selected
     if (selectedConversationIds.length !== 1) {
       return null;
     }
     
-    const allConversations = getAnalyticsData(data => data.all_conversations, []);
-    if (!allConversations) {
-      return null;
-    }
-    
     const conversationId = selectedConversationIds[0];
-    const conversation = allConversations.find((c: Conversation) => c.id === conversationId);
+    const conversation = analyticsData?.all_conversations.find((c: Conversation) => c.id === conversationId);
 
+    // If no summary exists yet, we simply don't render the card (or you could render a loading state)
     if (!conversation?.summary) {
       return null;
     }
 
     return (
-      <Paper sx={{ p: 2, mt: 2, border: '1px solid', borderColor: 'divider' }}>
-        <Typography variant="h6" gutterBottom>
-          Conversation Summary
-        </Typography>
-        <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
+      <Paper 
+        elevation={0}
+        sx={{ 
+          p: 3, 
+          mt: 3, 
+          border: '1px solid', 
+          borderColor: 'primary.main', 
+          backgroundColor: 'rgba(25, 118, 210, 0.04)', // Light primary color background
+          borderRadius: 2,
+          position: 'relative',
+          overflow: 'hidden'
+        }}
+      >
+        {/* Decorative background element */}
+        <Box sx={{ 
+            position: 'absolute', 
+            top: -20, 
+            right: -20, 
+            opacity: 0.1, 
+            transform: 'rotate(15deg)' 
+        }}>
+            <AutoAwesomeIcon sx={{ fontSize: 100, color: 'primary.main' }} />
+        </Box>
+
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+            <AutoAwesomeIcon color="primary" />
+            <Typography variant="h6" color="primary.main" sx={{ fontWeight: 700 }}>
+                AI Conversation Summary
+            </Typography>
+            <Chip label="BETA" size="small" color="primary" variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />
+        </Box>
+        
+        <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.6, color: 'text.primary' }}>
           {conversation.summary}
+        </Typography>
+        
+        <Typography variant="caption" sx={{ display: 'block', mt: 2, color: 'text.secondary', fontStyle: 'italic' }}>
+          Generated privately on your device using the DistilBART model.
         </Typography>
       </Paper>
     );
@@ -169,15 +167,10 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   function renderKpiSummary() {
     let totalMembers = 0;
-
     if (selectedConversationIds.length === 1) {
-      // If a single conversation is selected, show its member count
-      const selectedConvo = analyticsData?.all_conversations.find(
-        c => c.id === selectedConversationIds[0]
-      );
+      const selectedConvo = analyticsData?.all_conversations.find(c => c.id === selectedConversationIds[0]);
       totalMembers = selectedConvo?.memberCount || 0;
     } else {
-      // Otherwise, show the total members from all processed conversations
       totalMembers = analyticsData?.kpis.total_members || 0;
     }
 
@@ -289,168 +282,20 @@ const Dashboard: React.FC<DashboardProps> = ({
             ) : <Typography variant="body2" color="text.secondary">No data</Typography>}
           </Paper>
         </Grid>
-        <Grid item xs={12}>
-          <Paper sx={{ p: 2, mt: 3 }}>
-            <Typography variant="h6" gutterBottom>Top 3 Emojis by Author</Typography>
-            {analyticsData?.reactions?.top_emojis_by_author && Object.keys(analyticsData.reactions.top_emojis_by_author).length > 0 ? (
-              <TableContainer>
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell sx={{ fontWeight: 'bold' }}>Author</TableCell>
-                      <TableCell sx={{ fontWeight: 'bold' }}>Top Reactions</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {Object.entries(analyticsData.reactions.top_emojis_by_author).map(([authorId, emojis]) => {
-                      const userName = getUserName(authorId);
-                      return (
-                        <TableRow key={authorId}>
-                          <TableCell component="th" scope="row" sx={{ fontFamily: 'monospace', fontSize: '0.8rem', overflowWrap: 'break-word', maxWidth: '150px' }}>
-                            {userName}
-                          </TableCell>
-                          <TableCell>{(emojis as EmojiCount[]).map(e => `${e.emoji} (${e.count})`).join(', ')}</TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            ) : <Typography variant="body2" color="text.secondary">No data</Typography>}
-          </Paper>
-        </Grid>
       </Grid>
     );
   }
 
-  function renderAwardCard(title: string, award: { winner: string | null; count: number }) {
-    return (
-      <Grid item xs={12} sm={6} md={4} key={title}>
-        <Paper sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
-          <Typography variant="h6" component="div" sx={{ textAlign: 'center' }}>{title}</Typography>
-          {award.winner ? (
-            <>
-              <Typography variant="body1" color="text.secondary" sx={{ fontFamily: 'monospace', fontSize: '0.8rem', overflowWrap: 'break-word', my: 1, maxWidth: '100%' }}>
-                {award.winner ? getUserName(award.winner) : 'N/A'}
-              </Typography>
-              <Typography variant="h5" component="div" sx={{ fontWeight: 'bold' }}>
-                {award.count}
-              </Typography>
-            </>
-          ) : (
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-              No data
-            </Typography>
-          )}
-        </Paper>
-      </Grid>
-    );
-  }
-
-  function renderAwards() {
-    if (!analyticsData?.awards) return null;
-
-    const awardDisplayTitles: Record<keyof typeof analyticsData.awards, string> = {
-      most_messages_sent: "Most Messages Sent",
-      most_reactions_given: "Most Reactions Given",
-      most_reactions_received: "Most Reactions Received",
-      most_mentioned: "Most Mentioned",
-      most_mentions_made: "Most Mentions Made",
-      most_media_sent: "Most Media Sent",
-    };
-
-    return (
-      <Box sx={{ mt: 4 }}>
-        <Grid container spacing={3}>
-          {Object.entries(analyticsData.awards).map(([key, award]) =>
-            renderAwardCard(
-              awardDisplayTitles[key as keyof typeof analyticsData.awards],
-              award as { winner: string | null; count: number }
-            )
-          )}
-        </Grid>
-      </Box>
-    );
-  }
-
-  function EmotionRankings({ title, data, scoreLabel, totalReactsLabel }: {
-    title: string;
-    data: EmotionUserData[];
-    scoreLabel: string;
-    totalReactsLabel: string;
-  }) {
-    if (!data || data.length === 0) {
-      return null;
-    }
-
-    return (
-      <Box sx={{ mt: 4 }}>
-        <Typography variant="h5" gutterBottom>{title}</Typography>
-        <Paper sx={{ p: 2 }}>
-          <TableContainer>
-            <Table stickyHeader size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell sx={{ fontWeight: 'bold' }}>User</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 'bold' }}>{totalReactsLabel}</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 'bold' }}>Rate</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 'bold' }}>{scoreLabel}</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {data.map((user: EmotionUserData) => (
-                  <TableRow key={user.name}>
-                    <TableCell component="th" scope="row">{user.name}</TableCell>
-                    <TableCell align="right">{user.totalReacts}</TableCell>
-                    <TableCell align="right">{user.rate.toFixed(3)}</TableCell>
-                    <TableCell align="right">{user.score.toFixed(3)}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </Paper>
-      </Box>
-    );
-  }
-
-  // ---------------------------------------------------------------------------
-  // Render
-  // ---------------------------------------------------------------------------
-  if (loading) {
-    return (
-      <Box
-        sx={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          height: '100vh',
-        }}
+  return (
+    <Box sx={{ p: 2 }}>
+      <PageHeader 
+        title="Group Chat Analytics"
+        subtitle="Select a group chat to analyze its content and behavior of the members."
       >
-        <CircularProgress />
-      </Box>
-    );
-  }
-
-  if (error) {
-    return <Alert severity="error">{error}</Alert>;
-  }
-
-  if (!analyticsData) {
-    return <Typography>No data available.</Typography>;
-  }
-
-  if (!selectedConversationIds || selectedConversationIds.length === 0) {
-    return (
-      <Box sx={{ p: 2 }}>
-        <PageHeader 
-          title="Group Chat Analytics"
-          subtitle="Dig into the statistics and patterns of your group chats."
-        >
-          {analyticsData?.all_conversations && (
+        {analyticsData?.all_conversations && (
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
             <Autocomplete
-              size="medium"
-              sx={{ minWidth: 900, mt: { xs: 2, sm: 0 } }}
+              sx={{ minWidth: 300, mt: { xs: 2, sm: 0 } }}
               options={analyticsData.all_conversations.map((convo: Conversation) => convo.id)}
               getOptionLabel={(id) => {
                 const conversation = analyticsData.all_conversations.find((c: Conversation) => c.id === id);
@@ -461,72 +306,22 @@ const Dashboard: React.FC<DashboardProps> = ({
               renderInput={(params) => (
                 <TextField 
                   {...params} 
-                  label="
-                   Group Chat" 
+                  label="Select Group Chat" 
                   variant="outlined"
-                  size="medium"
+                  size="small"
                 />
               )}
               isOptionEqualToValue={(option, value) => option === value}
             />
-          )}
-        </PageHeader>
-      </Box>
-    );
-  }
-
-  return (
-    <Box sx={{ p: 2 }}>
-      <PageHeader 
-        title="Group Chat Analytics"
-        subtitle="Select a group chat to analyze its content and behavior of the members."
-      >
-        {analyticsData.all_conversations && (
-          <Autocomplete
-            size="medium"
-            sx={{ minWidth: 900, mt: { xs: 2, sm: 0 } }}
-            options={analyticsData.all_conversations.map((convo: Conversation) => convo.id)}
-            getOptionLabel={(id) => {
-              const conversation = analyticsData.all_conversations.find((c: Conversation) => c.id === id);
-              return conversation?.name || id;
-            }}
-            value={selectedConversationIds[0] || null}
-            onChange={handleConversationChange}
-            renderInput={(params) => (
-              <TextField 
-                {...params} 
-                label="Select Group Chat" 
-                variant="outlined"
-                size="medium"
-              />
-            )}
-            isOptionEqualToValue={(option, value) => option === value}
-          />
+          </Box>
         )}
       </PageHeader>
 
+      {/* Render the AI Summary here */}
       {renderConversationSummary()}
 
       {renderKpiSummary()}
       <Grid container spacing={3} sx={{ mt: 2 }}>
-        {/* Trends Section */}
-        <Grid item xs={5}>
-          <Typography
-            variant="h4"
-            sx={{
-              fontWeight: 'bold',
-              borderLeft: '6px solid #1976d2',
-              pl: 2,
-              mb: 2,
-              color: '#222',
-              background: 'linear-gradient(90deg, #f4f7fa 0%, #e3ecf7 100%)',
-              borderRadius: 2,
-              boxShadow: 1
-            }}
-          >
-            Trends
-          </Typography>
-        </Grid>
         <Grid item xs={12}>
           {renderDailyChart()}
         </Grid>
@@ -534,79 +329,13 @@ const Dashboard: React.FC<DashboardProps> = ({
            {renderHourlyChart()}
         </Grid>
 
-        {/* Reactions Section */}
-        <Grid item xs={5} sx={{ mb: -7 }}>
-          <Typography
-            variant="h4"
-            sx={{
-              fontWeight: 'bold',
-              borderLeft: '6px solid #1976d2',
-              pl: 2,
-              mb: 2,
-              color: '#222',
-              background: 'linear-gradient(90deg, #f4f7fa 0%, #e3ecf7 100%)',
-              borderRadius: 2,
-              boxShadow: 1
-            }}
-          >
-            Reactions
-          </Typography>
+        <Grid item xs={12} md={4}>
+          {renderTopConversations()}
         </Grid>
+
         <Grid item xs={12} sx={{ mb: 5 }}>
           {renderReactionAnalytics()}
         </Grid>
-
-        {/* Awards Section */}
-        <Grid item xs={5}>
-          <Typography
-            variant="h4"
-            sx={{
-              fontWeight: 'bold',
-              borderLeft: '6px solid #1976d2',
-              pl: 2,
-              mb: 2,
-              color: '#222',
-              background: 'linear-gradient(90deg, #f4f7fa 0%, #e3ecf7 100%)',
-              borderRadius: 2,
-              boxShadow: 1
-            }}
-          >
-            Awards
-          </Typography>
-        </Grid>
-        <Grid item xs={12} sx={{ mt: -5 }}>
-          {renderAwards()}
-        </Grid>
-        {/* Restore EmotionRankings sections */}
-        {analyticsData && (
-          <>
-            <Grid item xs={12}>
-              <EmotionRankings
-                title="😂 Who is the Funniest? 😂"
-                data={analyticsData.funniestUsers}
-                scoreLabel="Humor Score"
-                totalReactsLabel="Total Laugh Reacts"
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <EmotionRankings
-                title="❤️ Who is the Most Loved? ❤️"
-                data={analyticsData.mostLovedUsers}
-                scoreLabel="Love Score"
-                totalReactsLabel="Total Love Reacts"
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <EmotionRankings
-                title="😮 Who is the Most Shocking? 😮"
-                data={analyticsData.mostShockingUsers}
-                scoreLabel="Shock Score"
-                totalReactsLabel="Total Shock Reacts"
-              />
-            </Grid>
-
-          </>
-        )}
       </Grid>
     </Box>
   );
