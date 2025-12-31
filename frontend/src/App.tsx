@@ -22,20 +22,29 @@ function App() {
   const [progress, setProgress] = useState(0);
   const [progressMessage, setProgressMessage] = useState('');
   const [showProgress, setShowProgress] = useState(false);
+  
+  // Analytics State
   const [analyticsData, setAnalyticsData] = useState<AnalyticsData | null>(null);
+  const [originalAnalyticsData, setOriginalAnalyticsData] = useState<AnalyticsData | null>(null);
   const [initialDataLoaded, setInitialDataLoaded] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
   const [selectedConversationIds, setSelectedConversationIds] = useState<string[]>([]);
+  
+  // Individual Stats State
   const [selectedUser, setSelectedUser] = useState<string>('');
   const [statsData, setStatsData] = useState<IndividualStatsData | null>(null);
+  
+  // Snapshot Data State
+  const [staticIndividualStats, setStaticIndividualStats] = useState<Record<string, IndividualStatsData> | null>(null);
+
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [showWelcome, setShowWelcome] = useState(true);
-  const [originalAnalyticsData, setOriginalAnalyticsData] = useState<AnalyticsData | null>(null);
 
   const navigate = useNavigate();
   const location = useLocation();
   const isSnapshotMode = location.pathname.startsWith('/snapshot');
 
+  // Handle Snapshot Mode Initialization
   useEffect(() => {
     if (isSnapshotMode && !initialDataLoaded && STATIC_SNAPSHOT) {
       setLoading(true);
@@ -44,7 +53,11 @@ function App() {
         setAnalyticsData(STATIC_SNAPSHOT.analytics);
         setOriginalAnalyticsData(STATIC_SNAPSHOT.analytics);
         setUsers(STATIC_SNAPSHOT.users);
-        setDbBuffer(new ArrayBuffer(0));
+        
+        // Load pre-calculated individual stats from snapshot
+        setStaticIndividualStats(STATIC_SNAPSHOT.individualStats || {});
+
+        setDbBuffer(new ArrayBuffer(0)); // Dummy buffer to satisfy checks
         setCurrentDbName("Shared Snapshot");
         setInitialDataLoaded(true);
         setShowWelcome(false);
@@ -90,9 +103,9 @@ function App() {
     }
   };
 
+  // Effect 1: Load initial data (Skipped in Snapshot Mode)
   useEffect(() => {
     if (isSnapshotMode) return; 
-
     const loadInitialData = async () => {
       if (!dbBuffer) return;
       setLoading(true);
@@ -105,7 +118,6 @@ function App() {
           setProgressMessage(m);
         });
         setUsers(loadedUsers);
-        
         setProgressMessage('Loading database...');
         const analytics = await loadDatabase(
           dbBuffer, 
@@ -132,9 +144,9 @@ function App() {
     if (!initialDataLoaded) loadInitialData();
   }, [dbBuffer, dbKey, initialDataLoaded, isSnapshotMode]);
 
+  // Effect 2: Re-run analysis with filters (Skipped in Snapshot Mode)
   useEffect(() => {
     if (isSnapshotMode || !initialDataLoaded || !dbBuffer) return;
-
     const reAnalyzeWithFilter = async () => {
       setLoading(true);
       setError(null);
@@ -164,9 +176,24 @@ function App() {
     reAnalyzeWithFilter();
   }, [selectedConversationIds, initialDataLoaded, dbBuffer, dbKey, isSnapshotMode]);
 
+  // Effect 3: Load individual stats (Modified for Snapshot Mode support)
   useEffect(() => {
-    if (isSnapshotMode) return;
-    if (!dbBuffer || !selectedUser) return;
+    if (!selectedUser) return;
+
+    // --- SNAPSHOT MODE LOGIC ---
+    if (isSnapshotMode) {
+      if (staticIndividualStats && staticIndividualStats[selectedUser]) {
+        setStatsData(staticIndividualStats[selectedUser]);
+      } else {
+        // If data isn't in the snapshot, we can't show it.
+        // You might want to setError("Data not available in snapshot") here.
+        setStatsData(null); 
+      }
+      return;
+    }
+
+    // --- NORMAL MODE LOGIC ---
+    if (!dbBuffer) return;
     const fetchStats = async () => {
       setLoading(true);
       setError(null);
@@ -194,7 +221,7 @@ function App() {
       }
     };
     fetchStats();
-  }, [dbBuffer, dbKey, selectedUser, isSnapshotMode]);
+  }, [dbBuffer, dbKey, selectedUser, isSnapshotMode, staticIndividualStats]);
 
   const progressDialog = useMemo(() => (
     <ProgressDialog open={showProgress} progress={progress} message={progressMessage} title="Processing Database" />
@@ -210,6 +237,8 @@ function App() {
       <Routes>
         <Route path="/" element={<Navigate to="/app/summary" replace />} />
         <Route path="/app" element={<Navigate to="/app/summary" replace />} />
+        
+        {/* SNAPSHOT ROUTES */}
         <Route 
           path="/snapshot" 
           element={
@@ -229,8 +258,12 @@ function App() {
           <Route index element={<Navigate to="summary" replace />} />
           <Route path="summary" element={<SummaryPage data={originalAnalyticsData} loading={loading} error={error} users={users} />} />
           <Route path="groupchats" element={<Dashboard data={analyticsData} loading={loading} error={error} selectedConversationIds={selectedConversationIds} onConversationSelect={setSelectedConversationIds} users={users} selectedUser={selectedUser} onUserSelect={setSelectedUser} />} />
+          {/* New Route for Individual Stats in Snapshot Mode */}
+          <Route path="individual" element={<IndividualStats data={statsData} loading={loading} error={error} users={users} selectedUser={selectedUser} onUserSelect={setSelectedUser} />} />
           <Route path="*" element={<Navigate to="summary" replace />} />
         </Route>
+
+        {/* NORMAL APP ROUTES */}
         <Route 
           path="/app"
           element={

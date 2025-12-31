@@ -63,7 +63,13 @@ export async function summarize(
         // as a document to be summarized rather than a chat with complex instructions.
         const textToSummarize = `Conversation Log:\n${transcript}\n\nSummary of discussion topics and key points:`;
 
-        console.log(`Starting summarization for conversation ${conversationId || 'unknown'}, text length:`, textToSummarize.length);
+        console.log(`Starting summarization for conversation ${conversationId || 'unknown'}`);
+        console.log(`Input text length: ${textToSummarize.length} characters`);
+        
+        // LOGGING: Check what we are sending to the model
+        console.groupCollapsed('AI Input Transcript');
+        console.log(textToSummarize);
+        console.groupEnd();
         
         if (!conversationId) {
             console.log('Skipping summarization: No conversation ID provided');
@@ -75,19 +81,29 @@ export async function summarize(
             throw new Error('Failed to initialize summarization model.');
         }
         
+        console.log('Model ready, running inference...');
+        const startTime = performance.now();
+
         // Generate the summary
         const output = await generator(textToSummarize, {
             max_length: 150, // Keep it punchy
             min_length: 40,  // Ensure enough substance
             do_sample: false, // Deterministic output is usually better for summarization
         }) as SummarizationResult[];
+
+        const endTime = performance.now();
+        console.log(`Inference completed in ${((endTime - startTime) / 1000).toFixed(2)}s`);
+        
+        // LOGGING: Check the raw output
+        console.log('Raw Model Output:', output);
         
         if (!output || output.length === 0 || !output[0].summary_text) {
             throw new Error('Generated summary is empty or invalid.');
         }
         
-        console.log('Summary generated successfully');
-        return output[0].summary_text;
+        const summaryText = output[0].summary_text;
+        console.log('Final Summary:', summaryText);
+        return summaryText;
         
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';

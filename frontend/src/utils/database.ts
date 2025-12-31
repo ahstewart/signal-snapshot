@@ -3,8 +3,17 @@
 */
 
 import CryptoJS from 'crypto-js';
-import debug from 'debug';
 import { summarize, type ChatMessage } from './ai';
+
+// Simple logger to replace 'debug' package
+const log = (message: string, ...args: any[]) => {
+    // Only log if we are in development mode, or you can enable it always if preferred
+    if (process.env.NODE_ENV === 'development') {
+        console.log(`[Database] ${message}`, ...args);
+    }
+};
+
+// ... (Rest of imports and SqlJsStatic interface remain the same) ...
 
 // Efficiently convert CryptoJS WordArray to Uint8Array (avoids memory issues for large files)
 function wordArrayToUint8Array(wordArray: CryptoJS.lib.WordArray): Uint8Array {
@@ -20,8 +29,6 @@ function wordArrayToUint8Array(wordArray: CryptoJS.lib.WordArray): Uint8Array {
     return u8;
 }
 
-// We need to define the type for the sql.js instance, as we can't import it directly
-// in a way that satisfies all TypeScript configurations.
 export interface SqlJsStatic {
   Database: new (data?: Uint8Array | null) => {
     exec(sql: string): any[];
@@ -48,6 +55,7 @@ export async function getSqlJs(): Promise<SqlJsStatic> {
             return SQL;
         } catch (err) {
             console.error('Failed to initialize sql.js:', err);
+            // Reset promise on failure to allow future retries
             sqlJsInitPromise = null;
             throw err;
         }
@@ -64,6 +72,7 @@ export async function createDatabaseFromBuffer(dbBuffer: ArrayBuffer) {
     return new SQL.Database(new Uint8Array(dbBuffer));
 }
 
+// ... (Interfaces remain unchanged) ...
 export interface Conversation {
     id: string;
     name: string;
@@ -142,7 +151,7 @@ async function tryDecrypt(
     onProgress?: ProgressCallback
 ): Promise<ArrayBuffer | null> {
     try {
-        console.log(`[Decrypt] Trying decryption with ${description}`);
+        log(`[Decrypt] Trying decryption with ${description}`);
         if (onProgress) onProgress(0, `Starting ${description}...`);
         
         const CHUNK_SIZE = 1024 * 1024;
@@ -188,7 +197,6 @@ async function tryDecrypt(
         }
 
         if (!decrypted || decrypted.sigBytes === 0) return null;
-
         if (onProgress) onProgress(95, 'Converting data...');
         const decryptedArray = wordArrayToUint8Array(decrypted);
         const decryptedBuffer = decryptedArray.slice().buffer as ArrayBuffer;
@@ -198,19 +206,13 @@ async function tryDecrypt(
             const sqliteHeader = new TextEncoder().encode('SQLite format 3\0');
             let isSqlite = true;
             for (let i = 0; i < sqliteHeader.length; i++) {
-                if (header[i] !== sqliteHeader[i]) {
-                    isSqlite = false;
-                    break;
-                }
+                if (header[i] !== sqliteHeader[i]) { isSqlite = false; break; }
             }
-            if (isSqlite) {
-                console.log(`[Decrypt] Success! Valid SQLite database found with ${description}`);
-                return decryptedBuffer;
-            }
+            if (isSqlite) return decryptedBuffer;
         }
         return null;
     } catch (error) {
-        console.log(`[Decrypt] Error with ${description}:`, error);
+        log(`[Decrypt] Error with ${description}:`, error);
         return null;
     }
 }
@@ -262,7 +264,6 @@ export async function decryptDatabase(encrypted: ArrayBuffer, password: string, 
     }
 }
 
-// Updated loadDatabase with 5 arguments to match App.tsx usage
 export async function loadDatabase(
     dbBuffer: ArrayBuffer,
     key?: string,
@@ -306,7 +307,7 @@ export async function processDatabase(
     dateRange?: { startMs?: number; endMs?: number },
     onProgress?: ProgressCallback
 ): Promise<AnalyticsData> {
-    debug.log('Starting database processing');
+    log('Starting database processing');
     if (onProgress) onProgress(0, 'Initializing database processing...');
     
     try {
@@ -379,6 +380,11 @@ export async function processDatabase(
             });
         }
         
+        // ... (Rest of processing remains the same, just logging might be adjusted if needed but logic is preserved)
+        // For brevity, assuming the rest of the function logic is here as previously verified.
+        // Include the group/private query, summarization, etc.
+        // ... (Include groupConversationsQuery, privateConversationsQuery, summarization logic) ...
+
         const groupConversationsQuery = `SELECT id, name, type, active_at, json_extract(json, '$.messageCount') as messageCount, CASE WHEN members IS NULL OR members = '' THEN 0 ELSE (LENGTH(members) - LENGTH(REPLACE(members, ' ', ''))) + 1 END as memberCount FROM conversations WHERE type != 'private' ORDER BY messageCount DESC`;
         const groupConversationsResults = execAndLog(groupConversationsQuery);
         let groupConversations: Conversation[] = [];
@@ -408,6 +414,7 @@ export async function processDatabase(
             if (targetConvo) {
                 if (onProgress) onProgress(40, `Generating AI summary for ${targetConvo.name}...`);
                 
+                // Fetch MORE messages (1000) for better context
                 const summaryQuery = `
                     SELECT 
                         json_extract(json, '$.sourceName') as author,
@@ -416,7 +423,7 @@ export async function processDatabase(
                     WHERE conversationId = '${targetId}'
                     AND json_extract(json, '$.body') IS NOT NULL
                     ORDER BY sent_at DESC
-                    LIMIT 250
+                    LIMIT 1000
                 `;
                 
                 const summaryRes = execAndLog(summaryQuery);
@@ -426,10 +433,15 @@ export async function processDatabase(
                     const messagesForAi: ChatMessage[] = rows.map(([author, body]: any[]) => ({
                         Author: author || 'Unknown',
                         Body: body
-                    }));
+                    })).filter(msg => msg.Body && msg.Body.length > 3);
 
                     try {
-                        const summaryText = await summarize(messagesForAi, (p: any) => {}, targetId);
+                        const summaryText = await summarize(messagesForAi, (p: any) => {
+                             if (onProgress && p && p.status) {
+                                 onProgress(40, `AI: ${p.status}`); 
+                             }
+                        }, targetId);
+                        
                         if (summaryText) {
                             targetConvo.summary = summaryText;
                         }
@@ -515,7 +527,7 @@ export async function processDatabase(
         });
 
         if (onProgress) onProgress(90, 'Finalizing analysis...');
-        debug.log('Analytics data generated successfully');
+        log('Analytics data generated successfully');
         if (onProgress) onProgress(100, 'Analysis complete!');
 
         if (onProgress) onProgress(95, 'Calculating emotion rankings...');
@@ -570,6 +582,7 @@ function calculateEmotionRankings(db: any, userNamesById: Record<string, string>
     const shockEmojis = ['😮', '🤯', '😱'];
     const loveEmojis = ['❤️', '😍', '🥰'];
 
+    // Get total message counts for all users to calculate rates
     const messagesWhereClause = buildWhereClause('m', 'conversationId');
     const messageCountsQuery = `
         SELECT
@@ -610,13 +623,13 @@ function calculateEmotionRankings(db: any, userNamesById: Record<string, string>
         }
 
         return results[0].values.map(([recipientId, totalReacts]: [string, number]) => {
-            const messageCount = messageCountsByAuthor[recipientId] || 1; 
+            const messageCount = messageCountsByAuthor[recipientId] || 1; // Default to 1 to avoid division by zero
             const rate = totalReacts / messageCount;
             return {
                 name: userNamesById[recipientId] || recipientId,
                 totalReacts,
                 rate: rate,
-                score: rate * Math.log10(messageCount + 1)
+                score: rate * Math.log10(messageCount + 1) // Use a logarithmic scale to balance the score
             };
         }).sort((a: { score: number }, b: { score: number }) => b.score - a.score);
     };
@@ -661,9 +674,10 @@ export interface IndividualStatsData {
 
 export async function getUsers(dbBuffer: ArrayBuffer): Promise<User[]> {
     try {
-        debug('Creating database from buffer...');
+        log('Creating database from buffer...');
         const db = await createDatabaseFromBuffer(dbBuffer);
         const nameMap = new Map<string, string>();
+        // Query to get user name mappings from conversations
         const nameMappingQuery = `
             SELECT id, serviceId, profileFullName, profileName
             FROM conversations
@@ -679,6 +693,7 @@ export async function getUsers(dbBuffer: ArrayBuffer): Promise<User[]> {
                 }
             });
         }
+        // Collect all unique user IDs from messages and reactions
         const messageSendersQuery = `SELECT DISTINCT sourceServiceId FROM messages WHERE sourceServiceId IS NOT NULL`;
         const messageSendersResult = db.exec(messageSendersQuery);
         const messageSenders = messageSendersResult[0]?.values.map(([id]: [string]) => id) || [];
@@ -688,11 +703,14 @@ export async function getUsers(dbBuffer: ArrayBuffer): Promise<User[]> {
         const reactionReceiversQuery = `SELECT DISTINCT targetAuthorAci FROM reactions WHERE targetAuthorAci IS NOT NULL`;
         const reactionReceiversResult = db.exec(reactionReceiversQuery);
         const reactionReceivers = reactionReceiversResult[0]?.values.map(([id]: [string]) => id) || [];
+        // Only keep users whose ID appears in at least one of these tables
         const allUserIds = [...new Set([...messageSenders, ...reactionGivers, ...reactionReceivers])];
+        // Build users from the conversations table, mapping id/serviceId to User.id/fromId
         const users: User[] = [];
         if (nameMappingResults[0]) {
             nameMappingResults[0].values.forEach(([id, serviceId, profileFullName, profileName]: [string, string, string, string]) => {
                 const name = (profileFullName || profileName || '').trim() || serviceId || id;
+                // Only include if serviceId or id is in allUserIds
                 if (allUserIds.includes(serviceId) || allUserIds.includes(id)) {
                     users.push({
                         id: serviceId,
@@ -702,6 +720,7 @@ export async function getUsers(dbBuffer: ArrayBuffer): Promise<User[]> {
                 }
             });
         }
+        // Add any users from allUserIds not already included by serviceId
         allUserIds.forEach(uid => {
             if (!users.some(u => u.id === uid)) {
                 users.push({
@@ -711,6 +730,7 @@ export async function getUsers(dbBuffer: ArrayBuffer): Promise<User[]> {
                 });
             }
         });
+        // Deduplicate users by name, keeping the first occurrence
         const uniqueUsersByName = new Map<string, User>();
         for (const user of users) {
             if (!uniqueUsersByName.has(user.name)) {
@@ -726,21 +746,21 @@ export async function getUsers(dbBuffer: ArrayBuffer): Promise<User[]> {
 }
 
 export async function getIndividualStats(dbBuffer: ArrayBuffer, userId: string): Promise<IndividualStatsData> {
-    debug.log('getIndividualStats: called with userId', userId);
+    log('getIndividualStats: called with userId', userId);
     if (!userId) {
-        debug.log('getIndividualStats: No userId provided');
+        log('getIndividualStats: No userId provided');
         throw new Error('User ID is required to get individual stats.');
     }
 
     try {
-        debug.log('getIndividualStats: creating database from buffer');
+        log('getIndividualStats: creating database from buffer');
         const db = await createDatabaseFromBuffer(dbBuffer);
         const getIdsQuery = `SELECT id, serviceId FROM conversations WHERE id = '${userId}' OR serviceId = '${userId}' LIMIT 1`;
-        debug.log('getIndividualStats: getIdsQuery', getIdsQuery);
+        log('getIndividualStats: getIdsQuery', getIdsQuery);
         const getIdsResult = db.exec(getIdsQuery);
-        debug.log('getIndividualStats: getIdsResult', getIdsResult);
+        log('getIndividualStats: getIdsResult', getIdsResult);
         if (!getIdsResult[0] || !getIdsResult[0].values[0]) {
-            debug.log(`getIndividualStats: User not found in conversations table for userId=${userId}`);
+            log(`getIndividualStats: User not found in conversations table for userId=${userId}`);
             return {
                 totalMessagesSent: 0,
                 mostPopularDay: '',
@@ -753,18 +773,18 @@ export async function getIndividualStats(dbBuffer: ArrayBuffer, userId: string):
         }
         const userUUID = getIdsResult[0].values[0][0] as string;
         const userServiceId = getIdsResult[0].values[0][1] as string;
-        debug.log('getIndividualStats: userUUID', userUUID, 'userServiceId', userServiceId);
+        log('getIndividualStats: userUUID', userUUID, 'userServiceId', userServiceId);
 
         const totalMessagesQuery = `SELECT COUNT(*) FROM messages WHERE sourceServiceId = '${userServiceId}'`;
-        debug.log('getIndividualStats: totalMessagesQuery', totalMessagesQuery);
+        log('getIndividualStats: totalMessagesQuery', totalMessagesQuery);
         const totalMessagesResult = db.exec(totalMessagesQuery);
-        debug.log('getIndividualStats: totalMessagesResult', totalMessagesResult);
+        log('getIndividualStats: totalMessagesResult', totalMessagesResult);
         const totalMessagesSent = totalMessagesResult[0]?.values[0]?.[0] as number || 0;
 
         const allTimestampsQuery = `SELECT sent_at FROM messages WHERE sourceServiceId = '${userServiceId}'`;
-        debug.log('getIndividualStats: allTimestampsQuery', allTimestampsQuery);
+        log('getIndividualStats: allTimestampsQuery', allTimestampsQuery);
         const timestampsResult = db.exec(allTimestampsQuery);
-        debug.log('getIndividualStats: timestampsResult', timestampsResult);
+        log('getIndividualStats: timestampsResult', timestampsResult);
         let mostPopularDay = 'N/A';
         if (timestampsResult[0]?.values.length > 0) {
             const dayCounts = Array(7).fill(0); 
@@ -778,12 +798,12 @@ export async function getIndividualStats(dbBuffer: ArrayBuffer, userId: string):
             const dayMap = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
             mostPopularDay = dayMap[popularDayIndex];
         }
-        debug.log('getIndividualStats: mostPopularDay', mostPopularDay);
+        log('getIndividualStats: mostPopularDay', mostPopularDay);
 
         const totalReactionsQuery = `SELECT COUNT(*) FROM reactions WHERE fromId = '${userUUID}'`;
-        debug.log('getIndividualStats: totalReactionsQuery', totalReactionsQuery);
+        log('getIndividualStats: totalReactionsQuery', totalReactionsQuery);
         const totalReactionsResult = db.exec(totalReactionsQuery);
-        debug.log('getIndividualStats: totalReactionsResult', totalReactionsResult);
+        log('getIndividualStats: totalReactionsResult', totalReactionsResult);
         const totalReactionsSent = totalReactionsResult[0]?.values[0]?.[0] as number || 0;
 
         const reactedToMostQuery = `
@@ -795,9 +815,9 @@ export async function getIndividualStats(dbBuffer: ArrayBuffer, userId: string):
             ORDER BY count DESC
             LIMIT 1;
         `;
-        debug.log('getIndividualStats: reactedToMostQuery', reactedToMostQuery);
+        log('getIndividualStats: reactedToMostQuery', reactedToMostQuery);
         const reactedToMostResult = db.exec(reactedToMostQuery);
-        debug.log('getIndividualStats: reactedToMostResult', reactedToMostResult);
+        log('getIndividualStats: reactedToMostResult', reactedToMostResult);
         let reactedToMost = null;
         if (reactedToMostResult[0]?.values[0]) {
             const targetSvcId = reactedToMostResult[0].values[0][0] as string;
@@ -812,9 +832,9 @@ export async function getIndividualStats(dbBuffer: ArrayBuffer, userId: string):
                 ORDER BY count DESC
                 LIMIT 1;
             `;
-            debug.log('getIndividualStats: topEmojiQuery (reactedToMost)', topEmojiQuery);
+            log('getIndividualStats: topEmojiQuery (reactedToMost)', topEmojiQuery);
             const topEmojiResult = db.exec(topEmojiQuery);
-            debug.log('getIndividualStats: topEmojiResult (reactedToMost)', topEmojiResult);
+            log('getIndividualStats: topEmojiResult (reactedToMost)', topEmojiResult);
             const emoji = topEmojiResult[0]?.values[0]?.[0] as string || '??';
             reactedToMost = { name, count, emoji };
         }
@@ -828,9 +848,9 @@ export async function getIndividualStats(dbBuffer: ArrayBuffer, userId: string):
             ORDER BY count DESC
             LIMIT 1;
         `;
-        debug.log('getIndividualStats: receivedMostQuery', receivedMostQuery);
+        log('getIndividualStats: receivedMostQuery', receivedMostQuery);
         const receivedMostResult = db.exec(receivedMostQuery);
-        debug.log('getIndividualStats: receivedMostResult', receivedMostResult);
+        log('getIndividualStats: receivedMostResult', receivedMostResult);
         let receivedMostReactionsFrom = null;
         if (receivedMostResult[0]?.values[0]) {
             const fromId = receivedMostResult[0].values[0][0] as string;
@@ -845,9 +865,9 @@ export async function getIndividualStats(dbBuffer: ArrayBuffer, userId: string):
                 ORDER BY count DESC
                 LIMIT 1;
             `;
-            debug.log('getIndividualStats: topEmojiQuery (receivedMost)', topEmojiQuery);
+            log('getIndividualStats: topEmojiQuery (receivedMost)', topEmojiQuery);
             const topEmojiResult = db.exec(topEmojiQuery);
-            debug.log('getIndividualStats: topEmojiResult (receivedMost)', topEmojiResult);
+            log('getIndividualStats: topEmojiResult (receivedMost)', topEmojiResult);
             const emoji = topEmojiResult[0]?.values[0]?.[0] as string || '??';
             receivedMostReactionsFrom = { name, count, emoji };
         }
@@ -873,9 +893,9 @@ export async function getIndividualStats(dbBuffer: ArrayBuffer, userId: string):
             ORDER BY reaction_count DESC
             LIMIT 1;
         `;
-        debug.log('getIndividualStats: popularMessageQuery', popularMessageQuery);
+        log('getIndividualStats: popularMessageQuery', popularMessageQuery);
         const popularMessageResult = db.exec(popularMessageQuery);
-        debug.log('getIndividualStats: popularMessageResult', popularMessageResult);
+        log('getIndividualStats: popularMessageResult', popularMessageResult);
         let mostPopularMessage = null;
         if (popularMessageResult[0]?.values[0]) {
             const messageId = popularMessageResult[0].values[0][0] as string;
@@ -898,14 +918,14 @@ export async function getIndividualStats(dbBuffer: ArrayBuffer, userId: string):
                 JOIN conversations c ON nr.fromId = c.id
                 WHERE nr.rn = 1;
             `;
-            debug.log('getIndividualStats: reactionsForMessageQuery', reactionsForMessageQuery);
+            log('getIndividualStats: reactionsForMessageQuery', reactionsForMessageQuery);
             const reactionsForMessageResult = db.exec(reactionsForMessageQuery);
-            debug.log('getIndividualStats: reactionsForMessageResult', reactionsForMessageResult);
+            log('getIndividualStats: reactionsForMessageResult', reactionsForMessageResult);
             const reactions = reactionsForMessageResult[0] ? reactionsForMessageResult[0].values.map((row: any) => ({ emoji: row[0], sender: row[1] })) : [];
             mostPopularMessage = { text, reactionCount, reactions };
         }
 
-        debug.log('getIndividualStats: returning stats', {
+        log('getIndividualStats: returning stats', {
             totalMessagesSent,
             mostPopularDay,
             totalReactionsSent,
@@ -927,7 +947,7 @@ export async function getIndividualStats(dbBuffer: ArrayBuffer, userId: string):
             })()
         };
     } catch (error) {
-        debug.log(`Error getting stats for user ${userId}:`, error);
+        log(`Error getting stats for user ${userId}:`, error);
         throw new Error('Failed to get individual stats.');
     }
 }
@@ -946,19 +966,23 @@ export async function loadUsers(
                        fileHeader.every((byte, i) => byte === sqliteHeader[i]);
 
     try {
+        // First, check if we need to decrypt
         if (!isDecrypted) {
             if (!key) {
                 throw new Error('This database is encrypted. Please provide a key.');
             }
             if (onProgress) onProgress(0, 'Decrypting user data...');
+            // Decrypt the database
             const decryptedBuffer = await decryptDatabase(dbBuffer, key, onProgress);
             
+            // After decryption, load the users
             if (onProgress) onProgress(90, 'Loading user data...');
             const users = await getUsers(decryptedBuffer);
             
             if (onProgress) onProgress(100, 'User data loaded successfully');
             return users;
         } else {
+            // If already decrypted, just load the users
             if (onProgress) onProgress(50, 'Loading user data...');
             const users = await getUsers(dbBuffer);
             

@@ -1,5 +1,4 @@
 import React from 'react';
-
 import {
   Alert,
   Box,
@@ -25,9 +24,10 @@ import {
   Tooltip,
 } from 'recharts';
 import { Autocomplete, TextField } from '@mui/material';
-import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome'; // Import the icon
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 
-import { AnalyticsData, Conversation, User } from '../utils/database';
+// Added EmotionUserData to imports
+import { AnalyticsData, Conversation, User, EmotionUserData } from '../utils/database';
 import { PageHeader } from './PageHeader';
 
 interface DashboardProps {
@@ -95,9 +95,7 @@ const Dashboard: React.FC<DashboardProps> = ({
     );
   }
 
-  // --- NEW: AI Summary Widget ---
   function renderConversationSummary() {
-    // Only show if exactly one conversation is selected
     if (selectedConversationIds.length !== 1) {
       return null;
     }
@@ -105,7 +103,6 @@ const Dashboard: React.FC<DashboardProps> = ({
     const conversationId = selectedConversationIds[0];
     const conversation = analyticsData?.all_conversations.find((c: Conversation) => c.id === conversationId);
 
-    // If no summary exists yet, we simply don't render the card (or you could render a loading state)
     if (!conversation?.summary) {
       return null;
     }
@@ -118,13 +115,12 @@ const Dashboard: React.FC<DashboardProps> = ({
           mt: 3, 
           border: '1px solid', 
           borderColor: 'primary.main', 
-          backgroundColor: 'rgba(25, 118, 210, 0.04)', // Light primary color background
+          backgroundColor: 'rgba(25, 118, 210, 0.04)',
           borderRadius: 2,
           position: 'relative',
           overflow: 'hidden'
         }}
       >
-        {/* Decorative background element */}
         <Box sx={{ 
             position: 'absolute', 
             top: -20, 
@@ -286,6 +282,100 @@ const Dashboard: React.FC<DashboardProps> = ({
     );
   }
 
+  function renderAwardCard(title: string, award: { winner: string | null; count: number }) {
+    return (
+      <Grid item xs={12} sm={6} md={4} key={title}>
+        <Paper sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
+          <Typography variant="h6" component="div" sx={{ textAlign: 'center', fontSize: '1.1rem' }}>{title}</Typography>
+          {award.winner ? (
+            <>
+              <Typography variant="body1" color="text.secondary" sx={{ fontFamily: 'monospace', fontSize: '0.8rem', overflowWrap: 'break-word', my: 1, maxWidth: '100%', textAlign: 'center' }}>
+                {getUserName(award.winner)}
+              </Typography>
+              <Typography variant="h5" component="div" sx={{ fontWeight: 'bold' }}>
+                {award.count}
+              </Typography>
+            </>
+          ) : (
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+              No data
+            </Typography>
+          )}
+        </Paper>
+      </Grid>
+    );
+  }
+
+  function renderAwards() {
+    if (!analyticsData?.awards) return null;
+
+    const awardDisplayTitles: Record<keyof typeof analyticsData.awards, string> = {
+      most_messages_sent: "Most Messages Sent",
+      most_reactions_given: "Most Reactions Given",
+      most_reactions_received: "Most Reactions Received",
+      most_mentioned: "Most Mentioned",
+      most_mentions_made: "Most Mentions Made",
+      most_media_sent: "Most Media Sent",
+    };
+
+    return (
+      <Box sx={{ mt: 4 }}>
+         <Typography variant="h4" sx={{ fontWeight: 'bold', borderLeft: '6px solid #1976d2', pl: 2, mb: 2, color: '#222', background: 'linear-gradient(90deg, #f4f7fa 0%, #e3ecf7 100%)', borderRadius: 2, boxShadow: 1 }}>
+            Awards
+         </Typography>
+        <Grid container spacing={3}>
+          {Object.entries(analyticsData.awards).map(([key, award]) =>
+            renderAwardCard(
+              awardDisplayTitles[key as keyof typeof analyticsData.awards] || key,
+              award as { winner: string | null; count: number }
+            )
+          )}
+        </Grid>
+      </Box>
+    );
+  }
+
+  function EmotionRankings({ title, data, scoreLabel, totalReactsLabel }: {
+    title: string;
+    data: EmotionUserData[];
+    scoreLabel: string;
+    totalReactsLabel: string;
+  }) {
+    if (!data || data.length === 0) {
+      return null;
+    }
+
+    return (
+      <Box sx={{ mt: 4 }}>
+        <Typography variant="h5" gutterBottom>{title}</Typography>
+        <Paper sx={{ p: 2 }}>
+          <TableContainer>
+            <Table stickyHeader size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ fontWeight: 'bold' }}>User</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 'bold' }}>{totalReactsLabel}</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 'bold' }}>Rate</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 'bold' }}>{scoreLabel}</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {data.slice(0, 10).map((user: EmotionUserData) => (
+                  <TableRow key={user.name}>
+                    <TableCell component="th" scope="row">{user.name}</TableCell>
+                    <TableCell align="right">{user.totalReacts}</TableCell>
+                    <TableCell align="right">{user.rate.toFixed(3)}</TableCell>
+                    <TableCell align="right">{user.score.toFixed(3)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Paper>
+      </Box>
+    );
+  }
+
   return (
     <Box sx={{ p: 2 }}>
       <PageHeader 
@@ -317,7 +407,6 @@ const Dashboard: React.FC<DashboardProps> = ({
         )}
       </PageHeader>
 
-      {/* Render the AI Summary here */}
       {renderConversationSummary()}
 
       {renderKpiSummary()}
@@ -336,6 +425,40 @@ const Dashboard: React.FC<DashboardProps> = ({
         <Grid item xs={12} sx={{ mb: 5 }}>
           {renderReactionAnalytics()}
         </Grid>
+        
+        {/* Restored Awards and Rankings Sections */}
+        <Grid item xs={12}>
+          {renderAwards()}
+        </Grid>
+
+        {analyticsData && (
+            <>
+                <Grid item xs={12} md={6} lg={4}>
+                <EmotionRankings
+                    title="😂 Who is the Funniest? 😂"
+                    data={analyticsData.funniestUsers}
+                    scoreLabel="Humor Score"
+                    totalReactsLabel="Total Laugh Reacts"
+                />
+                </Grid>
+                <Grid item xs={12} md={6} lg={4}>
+                <EmotionRankings
+                    title="❤️ Who is the Most Loved? ❤️"
+                    data={analyticsData.mostLovedUsers}
+                    scoreLabel="Love Score"
+                    totalReactsLabel="Total Love Reacts"
+                />
+                </Grid>
+                <Grid item xs={12} md={6} lg={4}>
+                <EmotionRankings
+                    title="😮 Who is the Most Shocking? 😮"
+                    data={analyticsData.mostShockingUsers}
+                    scoreLabel="Shock Score"
+                    totalReactsLabel="Total Shock Reacts"
+                />
+                </Grid>
+            </>
+        )}
       </Grid>
     </Box>
   );

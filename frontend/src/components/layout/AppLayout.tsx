@@ -1,4 +1,3 @@
-// ... (imports remain the same as previous correct version)
 import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation } from 'react-router-dom';
 import { 
@@ -17,10 +16,7 @@ import {
   Dialog, 
   DialogTitle, 
   DialogContent, 
-  DialogContentText, 
   DialogActions, 
-  Tabs, 
-  Tab, 
   Box as MuiBox, 
   IconButton, 
   TextField, 
@@ -28,10 +24,10 @@ import {
   MenuItem, 
   FormControl, 
   InputLabel, 
-  CircularProgress,
-  Tooltip
+  CircularProgress, 
+  Tooltip 
 } from '@mui/material';
-import { AnalyticsData, loadDatabase, loadIndividualStats, User } from '../../utils/database';
+import { AnalyticsData, loadDatabase, loadIndividualStats, loadUsers } from '../../utils/database';
 import { createDashboardHtml } from '../../utils/export';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import PersonIcon from '@mui/icons-material/Person';
@@ -39,7 +35,6 @@ import SummarizeIcon from '@mui/icons-material/Summarize';
 import ChatIcon from '@mui/icons-material/Chat';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import CloseIcon from '@mui/icons-material/Close';
-import UploadFileIcon from '@mui/icons-material/UploadFile';
 import GitHubIcon from '@mui/icons-material/GitHub';
 
 interface AppLayoutProps {
@@ -71,14 +66,15 @@ const AppLayout: React.FC<AppLayoutProps> = ({
 }) => {
   const location = useLocation();
   const [welcomeOpen, setWelcomeOpen] = useState(showWelcome);
+  
+  // Export dialog state
   const [exportOpen, setExportOpen] = useState(false);
   const [exportSelectedConvos, setExportSelectedConvos] = useState<string>('');
-  const [exportUsers, setExportUsers] = useState<any[]>([]);
-  const [exportSelectedUsers, setExportSelectedUsers] = useState<string[]>([]);
   const [exportStartDate, setExportStartDate] = useState<string | null>(null);
   const [exportEndDate, setExportEndDate] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [exportProgress, setExportProgress] = useState(0);
+  const [exportStatus, setExportStatus] = useState<string>('');
 
   useEffect(() => {
     setWelcomeOpen(showWelcome);
@@ -95,40 +91,93 @@ const AppLayout: React.FC<AppLayoutProps> = ({
   const menuItems = [
     { text: 'Summary', icon: <SummarizeIcon />, path: `${basePath}/summary` },
     { text: 'Group Chats', icon: <DashboardIcon />, path: `${basePath}/groupchats` },
+    // Include Individual stats in both modes
+    { text: 'Individual', icon: <PersonIcon />, path: `${basePath}/individual` }
   ];
 
   if (!isSnapshotMode) {
     menuItems.push(
       { text: '1:1 Stats', icon: <ChatIcon />, path: `${basePath}/oneonones` },
-      { text: 'Individual', icon: <PersonIcon />, path: `${basePath}/individual` }
     );
   }
-
-  // ... (TabPanel helper same as before) ...
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh' }}>
       <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
         <Toolbar>
-          <Typography variant="h6" component={Link} to="/" sx={{ fontWeight: 'bold', mr: 3, color: 'inherit', textDecoration: 'none', '&:hover': { textDecoration: 'none', cursor: 'pointer', opacity: 0.9 } }}>
-            Signal Snapshot {isSnapshotMode && '(Read Only)'}
+          <Typography 
+            variant="h6" 
+            component={Link} 
+            to="/"
+            sx={{ 
+              fontWeight: 'bold', 
+              mr: 3, 
+              color: 'inherit',
+              textDecoration: 'none',
+              '&:hover': { textDecoration: 'none', cursor: 'pointer', opacity: 0.9 }
+            }}
+          >
+            Signal Snapshot {isSnapshotMode && '(Units 2025)'}
           </Typography>
           <Box sx={{ flexGrow: 1 }} />
+          
           <IconButton color="inherit" onClick={handleWelcomeOpen} aria-label="About Signal Snapshot" sx={{ mr: 1 }}>
             <HelpOutlineIcon />
           </IconButton>
+
           {dbBuffer && !isSnapshotMode && (
             <>
               <Tooltip title={currentDbName}>
-                <Typography variant="body2" component="div" sx={{ color: 'rgba(255, 255, 255, 0.7)', fontFamily: 'monospace', fontSize: '0.8rem', maxWidth: '200px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', mr: 1 }}>
+                <Typography 
+                  variant="body2" 
+                  component="div" 
+                  sx={{ 
+                    color: 'rgba(255, 255, 255, 0.7)',
+                    fontFamily: 'monospace',
+                    fontSize: '0.8rem',
+                    maxWidth: '200px',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    mr: 1
+                  }}
+                >
                   {currentDbName}
                 </Typography>
               </Tooltip>
-              <input type="file" accept=".db,.sqlite,.sqlite3" onChange={onFileChange} style={{ display: 'none' }} id="change-db-input" key={currentDbName} />
-              <Button variant="contained" color="primary" onClick={() => document.getElementById('change-db-input')?.click()} sx={{ ml: 2, backgroundColor: 'white', color: 'primary.main', '&:hover': { backgroundColor: '#f5f5f5', boxShadow: '0px 2px 4px -1px rgba(0,0,0,0.2), 0px 4px 5px 0px rgba(0,0,0,0.14), 0px 1px 10px 0px rgba(0,0,0,0.12)' }, textTransform: 'none', fontWeight: 500 }}>
+              
+              <input
+                type="file"
+                accept=".db,.sqlite,.sqlite3"
+                onChange={onFileChange}
+                style={{ display: 'none' }}
+                id="change-db-input"
+                key={currentDbName}
+              />
+              <Button 
+                variant="contained"
+                color="primary"
+                onClick={() => document.getElementById('change-db-input')?.click()}
+                sx={{
+                  ml: 2,
+                  backgroundColor: 'white',
+                  color: 'primary.main',
+                  '&:hover': {
+                    backgroundColor: '#f5f5f5',
+                    boxShadow: '0px 2px 4px -1px rgba(0,0,0,0.2), 0px 4px 5px 0px rgba(0,0,0,0.14), 0px 1px 10px 0px rgba(0,0,0,0.12)'
+                  },
+                  textTransform: 'none',
+                  fontWeight: 500
+                }}
+              >
                 Change Data Source
               </Button>
-              <Button variant="outlined" color="inherit" sx={{ ml: 2, borderColor: 'rgba(255,255,255,0.5)', color: 'white' }} onClick={() => setExportOpen(true)}>
+              <Button
+                variant="outlined"
+                color="inherit"
+                sx={{ ml: 2, borderColor: 'rgba(255,255,255,0.5)', color: 'white' }}
+                onClick={() => setExportOpen(true)}
+              >
                 Export
               </Button>
             </>
@@ -142,19 +191,51 @@ const AppLayout: React.FC<AppLayoutProps> = ({
           <DialogContent>
             <Box sx={{ display: 'flex', gap: 2, flexDirection: 'column', mt: 1 }}>
               <Box sx={{ display: 'flex', gap: 2 }}>
-                <TextField label="Start date" type="date" value={exportStartDate ?? ''} onChange={(e) => setExportStartDate(e.target.value || null)} InputLabelProps={{ shrink: true }} fullWidth />
-                <TextField label="End date" type="date" value={exportEndDate ?? ''} onChange={(e) => setExportEndDate(e.target.value || null)} InputLabelProps={{ shrink: true }} fullWidth />
+                <TextField
+                  label="Start date"
+                  type="date"
+                  value={exportStartDate ?? ''}
+                  onChange={(e) => setExportStartDate(e.target.value || null)}
+                  InputLabelProps={{ shrink: true }}
+                  fullWidth
+                />
+                <TextField
+                  label="End date"
+                  type="date"
+                  value={exportEndDate ?? ''}
+                  onChange={(e) => setExportEndDate(e.target.value || null)}
+                  InputLabelProps={{ shrink: true }}
+                  fullWidth
+                />
               </Box>
+
               <FormControl fullWidth>
                 <InputLabel id="export-convos-label">Conversation</InputLabel>
-                <Select labelId="export-convos-label" value={exportSelectedConvos} label="Conversation" onChange={(e) => setExportSelectedConvos(typeof e.target.value === 'string' ? e.target.value : String(e.target.value))}>
+                <Select
+                  labelId="export-convos-label"
+                  value={exportSelectedConvos}
+                  label="Conversation"
+                  onChange={(e) => setExportSelectedConvos(typeof e.target.value === 'string' ? e.target.value : String(e.target.value))}
+                >
                   <MenuItem value="">All Conversations</MenuItem>
                   {(originalAnalyticsData?.all_conversations || []).map((c: any) => (
-                    <MenuItem key={c.id} value={c.id}><ListItemText primary={c.name} /></MenuItem>
+                    <MenuItem key={c.id} value={c.id}>
+                      <ListItemText primary={c.name} />
+                    </MenuItem>
                   ))}
                 </Select>
               </FormControl>
-              {exporting && <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}><CircularProgress size={20} /> <Typography>Processing ({exportProgress}%)</Typography></Box>}
+              {exporting && (
+                  <Box sx={{ mt: 2 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1 }}>
+                          <CircularProgress size={20} /> 
+                          <Typography variant="body2" color="text.secondary">
+                              Processing... {exportProgress}%
+                          </Typography>
+                      </Box>
+                      <Typography variant="caption" color="text.secondary">{exportStatus}</Typography>
+                  </Box>
+              )}
             </Box>
           </DialogContent>
           <DialogActions>
@@ -163,28 +244,71 @@ const AppLayout: React.FC<AppLayoutProps> = ({
               if (!dbBuffer) return;
               setExporting(true);
               setExportProgress(0);
+              setExportStatus('Analyzing database...');
+              
               try {
                 const dateRange: any = {};
                 if (exportStartDate) { const d = new Date(exportStartDate); d.setHours(0,0,0,0); dateRange.startMs = d.getTime(); }
                 if (exportEndDate) { const d = new Date(exportEndDate); d.setHours(23,59,59,999); dateRange.endMs = d.getTime(); }
                 const convFilter = exportSelectedConvos && exportSelectedConvos.length > 0 ? [exportSelectedConvos] : undefined;
                 
+                // 1. Re-query database for the main analytics export
                 const analytics = await loadDatabase(
                     dbBuffer, 
                     undefined, 
                     convFilter, 
                     Object.keys(dateRange).length ? dateRange : undefined, 
-                    (p: number, m: string) => setExportProgress(Math.floor(p)) // Fixed implicit any here
+                    (p: number, m: string) => {
+                        setExportProgress(Math.floor(p * 0.5));
+                        setExportStatus(m);
+                    }
                 );
                 
                 if (exportSelectedConvos && exportSelectedConvos.length > 0) {
-                  try {
-                    (analytics as any).all_conversations = (analytics as any).all_conversations ? (analytics as any).all_conversations.filter((c: any) => c.id === exportSelectedConvos) : [];
-                  } catch (e) {
-                    console.error('Failed to trim conversations for export', e);
-                  }
+                    (analytics as any).all_conversations = (analytics as any).all_conversations.filter((c: any) => c.id === exportSelectedConvos);
                 }
+
+                // 2. Fetch Users
+                setExportStatus('Loading users...');
+                const allUsers = await loadUsers(dbBuffer, undefined);
+
+                // 3. Export stats for Top 50 Users (Increased from 20)
+                const topUserNames = new Set(analytics.topUsersByMessageCount?.map(u => u.name) || []);
+                // Add top reaction users as well to ensure better coverage
+                const topReactors = new Set(analytics.topUsersByReactionCount?.map(u => u.name) || []);
                 
+                const usersToExport = allUsers
+                    .filter(u => topUserNames.has(u.name) || topReactors.has(u.name))
+                    .slice(0, 50);
+
+                if (usersToExport.length > 0) {
+                    setExportStatus(`Generating stats for ${usersToExport.length} users...`);
+                    const individualStatsArray = [];
+                    
+                    for (let i = 0; i < usersToExport.length; i++) {
+                        const user = usersToExport[i];
+                        const progress = 50 + Math.floor((i / usersToExport.length) * 40);
+                        setExportProgress(progress);
+                        setExportStatus(`Analyzing user: ${user.name}`);
+                        
+                        try {
+                            const stats = await loadIndividualStats(dbBuffer, undefined, user.id);
+                            individualStatsArray.push({
+                                id: user.id,
+                                name: user.name,
+                                stats: stats
+                            });
+                        } catch (e) {
+                            console.warn(`Skipping stats for user ${user.name}`, e);
+                        }
+                    }
+                    
+                    (analytics as any)['individual_stats'] = individualStatsArray;
+                }
+
+                setExportProgress(95);
+                setExportStatus('Creating HTML file...');
+
                 try {
                   const html = createDashboardHtml(analytics);
                   const blob = new Blob([html], { type: 'text/html' });
@@ -206,6 +330,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({
               } finally {
                 setExporting(false);
                 setExportProgress(0);
+                setExportStatus('');
               }
             }} variant="contained" disabled={exporting}>Export</Button>
           </DialogActions>
@@ -296,3 +421,4 @@ const AppLayout: React.FC<AppLayoutProps> = ({
 };
 
 export default AppLayout;
+
