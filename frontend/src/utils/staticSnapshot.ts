@@ -13,8 +13,7 @@ const RAW_DATA: RawSnapshotData = {
     {
       "id": "7666311e-a841-4ee2-b0cb-ac92463eb0d5",
       "name": "🍆 Absolute Units 🍆",
-      "type": "group",
-      "active_at": 1758782408027,
+      "active_at": "1758782408027",
       "messageCount": 38930,
       "memberCount": 24,
       "avgMessagesPerDay": 393
