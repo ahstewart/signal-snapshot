@@ -13,6 +13,7 @@ import {
   TableRow,
   Typography,
   Chip,
+  Tooltip as MuiTooltip,
 } from '@mui/material';
 import {
   ResponsiveContainer,
@@ -35,7 +36,7 @@ interface DashboardProps {
   loading: boolean;
   error: string | null;
   selectedConversationIds: string[];
-  onConversationSelect: React.Dispatch<React.SetStateAction<string[]>>;
+  onConversationSelect: (ids: string[]) => void;
   users: User[];
   selectedUser: string;
   onUserSelect: (user: string) => void;
@@ -199,46 +200,44 @@ const Dashboard: React.FC<DashboardProps> = ({
   }
 
   function renderHourlyChart() {
+    // Transform UTC hours to Pacific Time (UTC-7)
+    // We construct a new data array ordered 00:00 PT -> 23:00 PT
+    let pacificData: { hour: number; count: number }[] = [];
+    
+    if (analyticsData?.message_counts?.by_hour) {
+      const utcData = analyticsData.message_counts.by_hour;
+      
+      for (let h = 0; h < 24; h++) {
+        // Pacific Hour 'h' corresponds to UTC Hour '(h + 7)' (wrapping around 24)
+        // e.g., 00:00 PT is 07:00 UTC
+        const utcHour = (h + 7) % 24;
+        
+        // Database keys are strings like "07", "12"
+        const utcKey = utcHour.toString().padStart(2, '0');
+        const count = utcData[utcKey] || 0;
+        
+        pacificData.push({ hour: h, count });
+      }
+    }
+
     return (
       <Paper sx={{ p: 5, height: 400 }}>
-        <Typography variant="h6" gutterBottom>Hourly Activity</Typography>
-        {analyticsData?.message_counts?.by_hour ? (
+        <Typography variant="h6" gutterBottom>Hourly Activity (Pacific Time)</Typography>
+        {pacificData.length > 0 ? (
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={Object.entries(analyticsData.message_counts.by_hour)}>
-              <XAxis dataKey="0" tickFormatter={(v) => formatHour(parseInt(v as string, 10))} />
+            <LineChart data={pacificData}>
+              <XAxis 
+                dataKey="hour" 
+                tickFormatter={(v) => formatHour(parseInt(v as string, 10))} 
+                type="number"
+                domain={[0, 23]}
+                tickCount={12}
+              />
               <YAxis />
-              <Tooltip />
-              <Line type="monotone" dataKey="1" stroke="#8884d8" />
+              <Tooltip labelFormatter={(v) => `${formatHour(v)} PT`} />
+              <Line type="monotone" dataKey="count" stroke="#8884d8" />
             </LineChart>
           </ResponsiveContainer>
-        ) : <Typography variant="body2" color="text.secondary">No data</Typography>}
-      </Paper>
-    );
-  }
-
-  function renderTopConversations() {
-    return (
-      <Paper sx={{ p: 2, height: 'calc(100% - 32px)', display: 'flex', flexDirection: 'column' }}>
-        <Typography variant="h6" gutterBottom>Top Conversations</Typography>
-        {analyticsData?.top_conversations && analyticsData.top_conversations.length > 0 ? (
-          <TableContainer sx={{ flexGrow: 1 }}>
-            <Table stickyHeader size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell sx={{ fontWeight: 'bold' }}>Conversation</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 'bold' }}>Messages</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {analyticsData.top_conversations.map((convo: { name: string; count: number }) => (
-                  <TableRow key={convo.name}>
-                    <TableCell component="th" scope="row">{getUserName(convo.name)}</TableCell>
-                    <TableCell align="right">{convo.count}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
         ) : <Typography variant="body2" color="text.secondary">No data</Typography>}
       </Paper>
     );
@@ -282,18 +281,48 @@ const Dashboard: React.FC<DashboardProps> = ({
     );
   }
 
-  function renderAwardCard(title: string, award: { winner: string | null; count: number }) {
+  function renderAwardCard(title: string, award: { winner: string | null; count: number }, suffix: string = "", tooltip: string = "") {
     return (
       <Grid item xs={12} sm={6} md={4} key={title}>
         <Paper sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
-          <Typography variant="h6" component="div" sx={{ textAlign: 'center', fontSize: '1.1rem' }}>{title}</Typography>
+          <MuiTooltip title={tooltip} arrow placement="top">
+            <Typography 
+                variant="h6" 
+                component="div" 
+                sx={{ 
+                    textAlign: 'center', 
+                    fontSize: '1.0rem',
+                    textDecoration: 'underline dotted',
+                    textDecorationColor: 'text.secondary',
+                    cursor: 'help',
+                    width: 'fit-content',
+                    mb: 1,
+                    fontWeight: 800, // Bold
+                    color: 'text.secondary' // Lighter color
+                }}
+            >
+                {title}
+            </Typography>
+          </MuiTooltip>
           {award.winner ? (
             <>
-              <Typography variant="body1" color="text.secondary" sx={{ fontFamily: 'monospace', fontSize: '0.8rem', overflowWrap: 'break-word', my: 1, maxWidth: '100%', textAlign: 'center' }}>
+              <Typography 
+                variant="h4" 
+                component="div" 
+                sx={{ 
+                  fontWeight: 800, 
+                  fontSize: '1.5rem',
+                  overflowWrap: 'break-word', 
+                  my: 0.5, 
+                  maxWidth: '100%', 
+                  textAlign: 'center',
+                  color: 'primary.main'
+                }}
+              >
                 {getUserName(award.winner)}
               </Typography>
-              <Typography variant="h5" component="div" sx={{ fontWeight: 'bold' }}>
-                {award.count}
+              <Typography variant="h6" component="div" sx={{ fontWeight: 'medium', color: 'text.secondary', fontSize: '1rem' }}>
+                {award.count.toLocaleString()} {suffix && <Typography component="span" variant="body2" color="text.secondary" sx={{ ml: 0.5 }}>{suffix}</Typography>}
               </Typography>
             </>
           ) : (
@@ -316,6 +345,43 @@ const Dashboard: React.FC<DashboardProps> = ({
       most_mentioned: "Most Mentioned",
       most_mentions_made: "Most Mentions Made",
       most_media_sent: "Most Media Sent",
+      // New awards added to the display map
+      most_night_owl: "Night Owl",
+      most_early_bird: "Early Bird",
+      longest_avg_message: "The Rambler",
+      hottest_newbie: "Hottest Newbie",
+      lurker: "The Lurker",
+      most_unique_emojis: "The Emoji Artist",
+    };
+
+    const awardSuffixes: Record<keyof typeof analyticsData.awards, string> = {
+        most_messages_sent: "messages",
+        most_reactions_given: "reactions",
+        most_reactions_received: "received",
+        most_mentioned: "mentions",
+        most_mentions_made: "mentions",
+        most_media_sent: "files",
+        most_night_owl: "%", // Percentage
+        most_early_bird: "%", // Percentage
+        longest_avg_message: "chars/msg",
+        hottest_newbie: "messages",
+        lurker: "reacts/msg",
+        most_unique_emojis: "unique emojis"
+    };
+
+    const awardTooltips: Record<keyof typeof analyticsData.awards, string> = {
+      most_messages_sent: "Total count of messages sent.",
+      most_reactions_given: "Total count of reaction emojis added to others' messages.",
+      most_reactions_received: "Total count of reaction emojis received on their messages.",
+      most_mentioned: "Total times tagged/mentioned by others.",
+      most_mentions_made: "Total times they tagged/mentioned others.",
+      most_media_sent: "Total count of images, videos, or files sent.",
+      most_night_owl: "Percentage of their messages sent between 12 AM and 5 AM (Pacific).",
+      most_early_bird: "Percentage of their messages sent between 5 AM and 9 AM (Pacific).",
+      longest_avg_message: "Highest average character count per message (min 10 messages).",
+      hottest_newbie: "Most messages sent by a user who joined in 2025.",
+      lurker: "Highest ratio of reactions given to messages sent (min 5 reactions).",
+      most_unique_emojis: "Highest number of unique emoji types used in reactions."
     };
 
     return (
@@ -327,7 +393,9 @@ const Dashboard: React.FC<DashboardProps> = ({
           {Object.entries(analyticsData.awards).map(([key, award]) =>
             renderAwardCard(
               awardDisplayTitles[key as keyof typeof analyticsData.awards] || key,
-              award as { winner: string | null; count: number }
+              award as { winner: string | null; count: number },
+              awardSuffixes[key as keyof typeof analyticsData.awards] || "",
+              awardTooltips[key as keyof typeof analyticsData.awards] || ""
             )
           )}
         </Grid>
@@ -397,8 +465,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                 <TextField 
                   {...params} 
                   label="Select Group Chat" 
-                  variant="outlined"
-                  size="small"
+                  variant="outlined" 
+                  size="small" 
                 />
               )}
               isOptionEqualToValue={(option, value) => option === value}
@@ -416,10 +484,6 @@ const Dashboard: React.FC<DashboardProps> = ({
         </Grid>
         <Grid item xs={12} sx={{ mb: 5 }}>
            {renderHourlyChart()}
-        </Grid>
-
-        <Grid item xs={12} md={4}>
-          {renderTopConversations()}
         </Grid>
 
         <Grid item xs={12} sx={{ mb: 5 }}>
@@ -455,6 +519,30 @@ const Dashboard: React.FC<DashboardProps> = ({
                     data={analyticsData.mostShockingUsers}
                     scoreLabel="Shock Score"
                     totalReactsLabel="Total Shock Reacts"
+                />
+                </Grid>
+                <Grid item xs={12} md={6} lg={4}>
+                <EmotionRankings
+                    title="👎 Who is the Most Disliked? 👎"
+                    data={analyticsData.mostDislikedUsers}
+                    scoreLabel="Dislike Score"
+                    totalReactsLabel="Total Dislikes"
+                />
+                </Grid>
+                <Grid item xs={12} md={6} lg={4}>
+                <EmotionRankings
+                    title="🍆 Who is the Most Randy? 🍆"
+                    data={analyticsData.mostRandyUsers}
+                    scoreLabel="Randy Score"
+                    totalReactsLabel="Total Eggplants"
+                />
+                </Grid>
+                <Grid item xs={12} md={6} lg={4}>
+                <EmotionRankings
+                    title="🍆 Who is the Most Thirsty? 🍆"
+                    data={analyticsData.mostThirstyUsers}
+                    scoreLabel="Thirst Score"
+                    totalReactsLabel="Total Eggplants"
                 />
                 </Grid>
             </>

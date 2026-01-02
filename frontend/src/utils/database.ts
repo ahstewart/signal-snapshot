@@ -13,8 +13,6 @@ const log = (message: string, ...args: any[]) => {
     }
 };
 
-// ... (Rest of imports and SqlJsStatic interface remain the same) ...
-
 // Efficiently convert CryptoJS WordArray to Uint8Array (avoids memory issues for large files)
 function wordArrayToUint8Array(wordArray: CryptoJS.lib.WordArray): Uint8Array {
     const words = wordArray.words;
@@ -72,7 +70,6 @@ export async function createDatabaseFromBuffer(dbBuffer: ArrayBuffer) {
     return new SQL.Database(new Uint8Array(dbBuffer));
 }
 
-// ... (Interfaces remain unchanged) ...
 export interface Conversation {
     id: string;
     name: string;
@@ -130,10 +127,19 @@ export interface AnalyticsData {
         most_mentioned: Award;
         most_mentions_made: Award;
         most_media_sent: Award;
+        most_night_owl: Award;
+        most_early_bird: Award;
+        longest_avg_message: Award;
+        hottest_newbie: Award;
+        lurker: Award;
+        most_unique_emojis: Award;
     };
     funniestUsers: EmotionUserData[];
     mostShockingUsers: EmotionUserData[];
     mostLovedUsers: EmotionUserData[];
+    mostDislikedUsers: EmotionUserData[];
+    mostRandyUsers: EmotionUserData[];
+    mostThirstyUsers: EmotionUserData[]; 
     topUsersByMessageCount: UserActivity[];
     topUsersByReactionCount: UserActivity[];
     userNamesById: Record<string, string>;
@@ -359,10 +365,19 @@ export async function processDatabase(
                 most_mentioned: { winner: null, count: 0 },
                 most_mentions_made: { winner: null, count: 0 },
                 most_media_sent: { winner: null, count: 0 },
+                most_night_owl: { winner: null, count: 0 },
+                most_early_bird: { winner: null, count: 0 },
+                longest_avg_message: { winner: null, count: 0 },
+                hottest_newbie: { winner: null, count: 0 },
+                lurker: { winner: null, count: 0 },
+                most_unique_emojis: { winner: null, count: 0 },
             },
             funniestUsers: [],
             mostShockingUsers: [],
             mostLovedUsers: [],
+            mostDislikedUsers: [],
+            mostRandyUsers: [],
+            mostThirstyUsers: [],
             topUsersByMessageCount: [],
             topUsersByReactionCount: [],
             userNamesById: {},
@@ -379,11 +394,6 @@ export async function processDatabase(
                 }
             });
         }
-        
-        // ... (Rest of processing remains the same, just logging might be adjusted if needed but logic is preserved)
-        // For brevity, assuming the rest of the function logic is here as previously verified.
-        // Include the group/private query, summarization, etc.
-        // ... (Include groupConversationsQuery, privateConversationsQuery, summarization logic) ...
 
         const groupConversationsQuery = `SELECT id, name, type, active_at, json_extract(json, '$.messageCount') as messageCount, CASE WHEN members IS NULL OR members = '' THEN 0 ELSE (LENGTH(members) - LENGTH(REPLACE(members, ' ', ''))) + 1 END as memberCount FROM conversations WHERE type != 'private' ORDER BY messageCount DESC`;
         const groupConversationsResults = execAndLog(groupConversationsQuery);
@@ -413,41 +423,15 @@ export async function processDatabase(
             
             if (targetConvo) {
                 if (onProgress) onProgress(40, `Generating AI summary for ${targetConvo.name}...`);
-                
-                // Fetch MORE messages (1000) for better context
-                const summaryQuery = `
-                    SELECT 
-                        json_extract(json, '$.sourceName') as author,
-                        json_extract(json, '$.body') as body
-                    FROM messages 
-                    WHERE conversationId = '${targetId}'
-                    AND json_extract(json, '$.body') IS NOT NULL
-                    ORDER BY sent_at DESC
-                    LIMIT 1000
-                `;
-                
+                const summaryQuery = `SELECT json_extract(json, '$.sourceName') as author, json_extract(json, '$.body') as body FROM messages WHERE conversationId = '${targetId}' AND json_extract(json, '$.body') IS NOT NULL ORDER BY sent_at DESC LIMIT 1000`;
                 const summaryRes = execAndLog(summaryQuery);
-                
                 if (summaryRes[0]?.values?.length) {
                     const rows = [...summaryRes[0].values].reverse();
-                    const messagesForAi: ChatMessage[] = rows.map(([author, body]: any[]) => ({
-                        Author: author || 'Unknown',
-                        Body: body
-                    })).filter(msg => msg.Body && msg.Body.length > 3);
-
+                    const messagesForAi: ChatMessage[] = rows.map(([author, body]: any[]) => ({ Author: author || 'Unknown', Body: body })).filter(msg => msg.Body && msg.Body.length > 3);
                     try {
-                        const summaryText = await summarize(messagesForAi, (p: any) => {
-                             if (onProgress && p && p.status) {
-                                 onProgress(40, `AI: ${p.status}`); 
-                             }
-                        }, targetId);
-                        
-                        if (summaryText) {
-                            targetConvo.summary = summaryText;
-                        }
-                    } catch (e) {
-                        console.error('Summarization failed', e);
-                    }
+                        const summaryText = await summarize(messagesForAi, (p: any) => { if (onProgress && p && p.status) { onProgress(40, `AI: ${p.status}`); } }, targetId);
+                        if (summaryText) { targetConvo.summary = summaryText; }
+                    } catch (e) { console.error('Summarization failed', e); }
                 }
             }
         }
@@ -492,13 +476,97 @@ export async function processDatabase(
         }
 
         if (onProgress) onProgress(80, 'Generating awards...');
+        
+        // Define base where clauses for award queries
+        const msgWhere = buildWhereClause('messages', 'conversationId', 'sourceServiceId IS NOT NULL');
+        const reactWhere = buildWhereClause('reactions', 'conversationId', 'fromId IS NOT NULL');
+        const reactRecvWhere = buildWhereClause('reactions', 'conversationId', 'targetAuthorAci IS NOT NULL');
+        const mentionWhere = buildWhereClause('m', 'conversationId', 'mn.mentionAci IS NOT NULL');
+        const mentionMadeWhere = buildWhereClause('m', 'conversationId', 'm.sourceServiceId IS NOT NULL');
+        const mediaWhere = buildWhereClause('messages', 'conversationId', 'hasAttachments = 1 AND sourceServiceId IS NOT NULL');
+        
+        // --- Custom Where Clauses for Time-Based Awards ---
+        // Note: Using Pacific Time (UTC-7) modifier in SQLite
+        const avgLenWhere = buildWhereClause('messages', 'conversationId', "sourceServiceId IS NOT NULL AND body IS NOT NULL");
+        
         const awardQueries = {
-            most_messages_sent: `SELECT sourceServiceId, COUNT(*) as count FROM messages ${buildWhereClause('messages', 'conversationId', 'sourceServiceId IS NOT NULL')} GROUP BY sourceServiceId ORDER BY count DESC LIMIT 1`,
-            most_reactions_given: `SELECT fromId, COUNT(*) as count FROM reactions ${buildWhereClause('reactions', 'conversationId', 'fromId IS NOT NULL')} GROUP BY fromId ORDER BY count DESC LIMIT 1`,
-            most_reactions_received: `SELECT targetAuthorAci, COUNT(*) as count FROM reactions ${buildWhereClause('reactions', 'conversationId', 'targetAuthorAci IS NOT NULL')} GROUP BY targetAuthorAci ORDER BY count DESC LIMIT 1`,
-            most_mentioned: `SELECT mn.mentionAci, COUNT(*) as count FROM mentions mn JOIN messages m ON mn.messageId = m.id ${buildWhereClause('m', 'conversationId', 'mn.mentionAci IS NOT NULL')} GROUP BY mn.mentionAci ORDER BY count DESC LIMIT 1`,
-            most_mentions_made: `SELECT m.sourceServiceId, COUNT(mn.mentionAci) as count FROM mentions mn JOIN messages m ON mn.messageId = m.id ${buildWhereClause('m', 'conversationId', 'm.sourceServiceId IS NOT NULL')} GROUP BY m.sourceServiceId ORDER BY count DESC LIMIT 1`,
-            most_media_sent: `SELECT sourceServiceId, COUNT(*) as count FROM messages ${buildWhereClause('messages', 'conversationId', 'hasAttachments = 1 AND sourceServiceId IS NOT NULL')} GROUP BY sourceServiceId ORDER BY count DESC LIMIT 1`
+            most_messages_sent: `SELECT sourceServiceId, COUNT(*) as count FROM messages ${msgWhere} GROUP BY sourceServiceId ORDER BY count DESC LIMIT 1`,
+            most_reactions_given: `SELECT fromId, COUNT(*) as count FROM reactions ${reactWhere} GROUP BY fromId ORDER BY count DESC LIMIT 1`,
+            most_reactions_received: `SELECT targetAuthorAci, COUNT(*) as count FROM reactions ${reactRecvWhere} GROUP BY targetAuthorAci ORDER BY count DESC LIMIT 1`,
+            most_mentioned: `SELECT mn.mentionAci, COUNT(*) as count FROM mentions mn JOIN messages m ON mn.messageId = m.id ${mentionWhere} GROUP BY mn.mentionAci ORDER BY count DESC LIMIT 1`,
+            most_mentions_made: `SELECT m.sourceServiceId, COUNT(mn.mentionAci) as count FROM mentions mn JOIN messages m ON mn.messageId = m.id ${mentionMadeWhere} GROUP BY m.sourceServiceId ORDER BY count DESC LIMIT 1`,
+            most_media_sent: `SELECT sourceServiceId, COUNT(*) as count FROM messages ${mediaWhere} GROUP BY sourceServiceId ORDER BY count DESC LIMIT 1`,
+            
+            // --- New Awards ---
+            // Night Owl: 12AM-5AM Pacific
+            most_night_owl: `
+                SELECT sourceServiceId, 
+                ROUND(CAST(SUM(CASE WHEN strftime('%H', sent_at/1000, 'unixepoch', '-7 hours') BETWEEN '00' AND '04' THEN 1 ELSE 0 END) AS FLOAT) * 100.0 / COUNT(*), 1) as count 
+                FROM messages ${msgWhere} 
+                GROUP BY sourceServiceId 
+                HAVING COUNT(*) > 50 
+                ORDER BY count DESC 
+                LIMIT 1`,
+
+            // Early Bird: 5AM-9AM Pacific
+            most_early_bird: `
+                SELECT sourceServiceId, 
+                ROUND(CAST(SUM(CASE WHEN strftime('%H', sent_at/1000, 'unixepoch', '-7 hours') BETWEEN '05' AND '08' THEN 1 ELSE 0 END) AS FLOAT) * 100.0 / COUNT(*), 1) as count 
+                FROM messages ${msgWhere} 
+                GROUP BY sourceServiceId 
+                HAVING COUNT(*) > 50 
+                ORDER BY count DESC 
+                LIMIT 1`,
+            
+            longest_avg_message: `SELECT sourceServiceId, CAST(AVG(LENGTH(body)) AS INTEGER) as count FROM messages ${avgLenWhere} GROUP BY sourceServiceId HAVING COUNT(*) > 10 ORDER BY count DESC LIMIT 1`,
+            
+            // Hottest Newbie: Joined in 2025 (first message >= Jan 1 2025)
+            hottest_newbie: `
+                SELECT sourceServiceId, COUNT(*) as count
+                FROM messages
+                ${msgWhere ? msgWhere + ' AND ' : 'WHERE '} sourceServiceId IN (
+                    SELECT sourceServiceId
+                    FROM messages
+                    GROUP BY sourceServiceId
+                    HAVING MIN(sent_at) >= 1735689600000
+                )
+                GROUP BY sourceServiceId
+                ORDER BY count DESC
+                LIMIT 1
+            `,
+            
+            // Lurker: Highest Ratio of Reactions Given to Messages Sent (min 5 reactions)
+            lurker: `
+                SELECT
+                    r.fromId,
+                    CAST(r.react_count AS FLOAT) / (IFNULL(m.msg_count, 0) + 1) as ratio
+                FROM (
+                    SELECT fromId, COUNT(*) as react_count 
+                    FROM reactions 
+                    ${reactWhere} 
+                    GROUP BY fromId
+                ) r
+                LEFT JOIN (
+                    SELECT sourceServiceId, COUNT(*) as msg_count 
+                    FROM messages 
+                    ${msgWhere} 
+                    GROUP BY sourceServiceId
+                ) m
+                ON r.fromId = m.sourceServiceId
+                WHERE r.react_count > 5
+                ORDER BY ratio DESC
+                LIMIT 1
+            `,
+            
+            // Most Unique Emojis Used
+            most_unique_emojis: `
+                SELECT fromId, COUNT(DISTINCT emoji) as count 
+                FROM reactions 
+                ${reactWhere} 
+                GROUP BY fromId 
+                ORDER BY count DESC 
+                LIMIT 1
+            `
         };
 
         interface AwardResult {
@@ -519,9 +587,15 @@ export async function processDatabase(
         awardResults.forEach(({ award, result }: AwardResult) => {
             if (result) {
                 let [winner, count] = result;
-                if (award === 'most_reactions_given' && analytics.userNamesById[winner]) {
+                if (analytics.userNamesById[winner]) {
                     winner = analytics.userNamesById[winner];
                 }
+                
+                // Format float ratios to 2 decimals for Lurker award
+                if (award === 'lurker') {
+                    count = parseFloat(count.toFixed(2));
+                }
+                
                 (analytics.awards as any)[award] = { winner, count };
             }
         });
@@ -535,6 +609,9 @@ export async function processDatabase(
         analytics.funniestUsers = emotionRankings.funniestUsers;
         analytics.mostShockingUsers = emotionRankings.mostShockingUsers;
         analytics.mostLovedUsers = emotionRankings.mostLovedUsers;
+        analytics.mostDislikedUsers = emotionRankings.mostDislikedUsers;
+        analytics.mostRandyUsers = emotionRankings.mostRandyUsers;
+        analytics.mostThirstyUsers = emotionRankings.mostThirstyUsers;
 
         if (onProgress) onProgress(97, 'Calculating top users...');
 
@@ -581,6 +658,8 @@ function calculateEmotionRankings(db: any, userNamesById: Record<string, string>
     const laughEmojis = ['😂', '🤣'];
     const shockEmojis = ['😮', '🤯', '😱'];
     const loveEmojis = ['❤️', '😍', '🥰'];
+    const dislikeEmojis = ['👎'];
+    const randyEmojis = ['🍆'];
 
     // Get total message counts for all users to calculate rates
     const messagesWhereClause = buildWhereClause('m', 'conversationId');
@@ -633,11 +712,48 @@ function calculateEmotionRankings(db: any, userNamesById: Record<string, string>
             };
         }).sort((a: { score: number }, b: { score: number }) => b.score - a.score);
     };
+    
+    // NEW: Ranking based on reaction GIVER
+    const getGivingRanking = (emojis: string[]): EmotionUserData[] => {
+        const emojiList = emojis.map(e => `'${e}'`).join(',');
+        const reactionsWhereClause = buildWhereClause('r', 'conversationId');
+
+        const query = `
+            SELECT
+                r.fromId as giverId,
+                COUNT(r.emoji) as reactionCount
+            FROM reactions r
+            ${reactionsWhereClause}
+            ${reactionsWhereClause ? 'AND' : 'WHERE'} r.emoji IN (${emojiList})
+            GROUP BY giverId
+            ORDER BY reactionCount DESC;
+        `;
+
+        const results = db.exec(query);
+        if (!results[0] || !results[0].values) {
+            return [];
+        }
+
+        return results[0].values.map(([giverId, totalReacts]: [string, number]) => {
+            const messageCount = messageCountsByAuthor[giverId] || 1; // Default to 1 to avoid division by zero
+            // For giving ranking, maybe rate is reactions given per message sent?
+            const rate = totalReacts / messageCount;
+            return {
+                name: userNamesById[giverId] || giverId,
+                totalReacts,
+                rate: rate,
+                score: rate * Math.log10(messageCount + 1) // Use a logarithmic scale to balance the score
+            };
+        }).sort((a: { score: number }, b: { score: number }) => b.score - a.score);
+    };
 
     return {
         funniestUsers: getRanking(laughEmojis),
         mostShockingUsers: getRanking(shockEmojis),
         mostLovedUsers: getRanking(loveEmojis),
+        mostDislikedUsers: getRanking(dislikeEmojis),
+        mostRandyUsers: getGivingRanking(randyEmojis), // Updated to use Giving Ranking
+        mostThirstyUsers: getRanking(randyEmojis), // New: Received 🍆
     };
 }
 
@@ -670,6 +786,8 @@ export interface IndividualStatsData {
         }[];
     } | null;
     uniqueReactions: string[];
+    // Optional summary field for AI-generated text
+    summary?: string; 
 }
 
 export async function getUsers(dbBuffer: ArrayBuffer): Promise<User[]> {
@@ -948,7 +1066,7 @@ export async function getIndividualStats(dbBuffer: ArrayBuffer, userId: string):
         };
     } catch (error) {
         log(`Error getting stats for user ${userId}:`, error);
-        throw new Error('Failed to get individual stats.');
+        throw new Error('Failed to load user stats. The database might be corrupted or the key is incorrect.');
     }
 }
 
@@ -966,29 +1084,18 @@ export async function loadUsers(
                        fileHeader.every((byte, i) => byte === sqliteHeader[i]);
 
     try {
-        // First, check if we need to decrypt
+        let decryptedBuffer = dbBuffer;
+        
         if (!isDecrypted) {
             if (!key) {
                 throw new Error('This database is encrypted. Please provide a key.');
             }
             if (onProgress) onProgress(0, 'Decrypting user data...');
-            // Decrypt the database
-            const decryptedBuffer = await decryptDatabase(dbBuffer, key, onProgress);
-            
-            // After decryption, load the users
-            if (onProgress) onProgress(90, 'Loading user data...');
-            const users = await getUsers(decryptedBuffer);
-            
-            if (onProgress) onProgress(100, 'User data loaded successfully');
-            return users;
-        } else {
-            // If already decrypted, just load the users
-            if (onProgress) onProgress(50, 'Loading user data...');
-            const users = await getUsers(dbBuffer);
-            
-            if (onProgress) onProgress(100, 'User data loaded successfully');
-            return users;
+            decryptedBuffer = await decryptDatabase(dbBuffer, key, onProgress);
         }
+        
+        if (onProgress) onProgress(90, 'Loading user data...');
+        return getUsers(decryptedBuffer);
     } catch (error) {
         console.error('Error loading users:', error);
         if (onProgress) onProgress(100, 'Error loading users');

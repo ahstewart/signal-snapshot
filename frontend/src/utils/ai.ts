@@ -1,4 +1,4 @@
-import { pipeline, env, SummarizationPipeline as XenovaSummarizationPipeline } from '@xenova/transformers';
+import { pipeline, env } from '@xenova/transformers';
 
 /**
  * A singleton class to manage the text summarization pipeline from transformers.js.
@@ -8,20 +8,23 @@ class SummarizationPipeline {
     static task = 'summarization' as const;
     // Xenova/distilbart-cnn-6-6 is optimized for speed/size in browser environments
     static model = 'Xenova/distilbart-cnn-6-6';
-    static instance: XenovaSummarizationPipeline | null = null;
+    
+    // Using 'any' to avoid strict type conflicts with the library's interfaces
+    static instance: Promise<any> | null = null;
 
     static async getInstance(progress_callback?: (progress: any) => void) {
         if (this.instance === null) {
             try {
+                // Configure environment to prefer local models if available, but allow remote
                 env.allowLocalModels = false;
                 env.allowRemoteModels = true;
 
                 console.log(`Loading summarization model: ${this.model}`);
                 
-                this.instance = await pipeline(this.task, this.model, {
+                this.instance = pipeline(this.task, this.model, {
                     quantized: true,
                     progress_callback,
-                }) as XenovaSummarizationPipeline;
+                });
                 
                 console.log('Summarization model loaded successfully.');
 
@@ -43,6 +46,20 @@ export interface ChatMessage {
     Body: string;
 }
 
+// ============================================================================
+// AI SYSTEM PROMPT CONFIGURATION
+// ============================================================================
+// We are using DistilBART again. These constants frame the input to look 
+// like a document structure the model understands.
+// ============================================================================
+
+// This text appears BEFORE the chat transcript. 
+const PROMPT_HEADER = "Conversation Log:";
+
+// This text appears AFTER the chat transcript.
+const PROMPT_TRIGGER = "Summary of discussion topics and key points:";
+
+
 export async function summarize(
     messages: ChatMessage[], 
     progress_callback?: (progress: any) => void,
@@ -59,17 +76,11 @@ export async function summarize(
             .map(msg => `${msg.Author}: ${msg.Body}`)
             .join('\n');
 
-        // DistilBART is a news summarizer. It responds best when we frame the input
-        // as a document to be summarized rather than a chat with complex instructions.
-        const textToSummarize = `Conversation Log:\n${transcript}\n\nSummary of discussion topics and key points:`;
+        // Construct the final input prompt using the constants defined above
+        const textToSummarize = `${PROMPT_HEADER}\n${transcript}\n\n${PROMPT_TRIGGER}`;
 
         console.log(`Starting summarization for conversation ${conversationId || 'unknown'}`);
         console.log(`Input text length: ${textToSummarize.length} characters`);
-        
-        // LOGGING: Check what we are sending to the model
-        console.groupCollapsed('AI Input Transcript');
-        console.log(textToSummarize);
-        console.groupEnd();
         
         if (!conversationId) {
             console.log('Skipping summarization: No conversation ID provided');

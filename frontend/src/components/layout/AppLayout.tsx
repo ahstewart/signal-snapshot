@@ -69,7 +69,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({
   
   // Export dialog state
   const [exportOpen, setExportOpen] = useState(false);
-  const [exportSelectedConvos, setExportSelectedConvos] = useState<string>('');
+  const [exportSelectedConvos, setExportSelectedConvos] = useState<string[]>([]);
   const [exportStartDate, setExportStartDate] = useState<string | null>(null);
   const [exportEndDate, setExportEndDate] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
@@ -92,7 +92,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({
     { text: 'Summary', icon: <SummarizeIcon />, path: `${basePath}/summary` },
     { text: 'Group Chats', icon: <DashboardIcon />, path: `${basePath}/groupchats` },
     // Include Individual stats in both modes
-    { text: 'Individual', icon: <PersonIcon />, path: `${basePath}/individual` }
+    { text: 'Individual Stats', icon: <PersonIcon />, path: `${basePath}/individual` }
   ];
 
   if (!isSnapshotMode) {
@@ -212,12 +212,24 @@ const AppLayout: React.FC<AppLayoutProps> = ({
               <FormControl fullWidth>
                 <InputLabel id="export-convos-label">Conversation</InputLabel>
                 <Select
+                  multiple
                   labelId="export-convos-label"
                   value={exportSelectedConvos}
                   label="Conversation"
-                  onChange={(e) => setExportSelectedConvos(typeof e.target.value === 'string' ? e.target.value : String(e.target.value))}
+                  onChange={(e) => {
+                    const { target: { value } } = e;
+                    setExportSelectedConvos(
+                      // On autofill we get a stringified value.
+                      typeof value === 'string' ? value.split(',') : value,
+                    );
+                  }}
+                  renderValue={(selected) => {
+                    if (selected.length === 0) {
+                      return <em>All Conversations</em>;
+                    }
+                    return (originalAnalyticsData?.all_conversations || []).filter(c => selected.includes(c.id)).map(c => c.name).join(', ');
+                  }}
                 >
-                  <MenuItem value="">All Conversations</MenuItem>
                   {(originalAnalyticsData?.all_conversations || []).map((c: any) => (
                     <MenuItem key={c.id} value={c.id}>
                       <ListItemText primary={c.name} />
@@ -250,7 +262,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({
                 const dateRange: any = {};
                 if (exportStartDate) { const d = new Date(exportStartDate); d.setHours(0,0,0,0); dateRange.startMs = d.getTime(); }
                 if (exportEndDate) { const d = new Date(exportEndDate); d.setHours(23,59,59,999); dateRange.endMs = d.getTime(); }
-                const convFilter = exportSelectedConvos && exportSelectedConvos.length > 0 ? [exportSelectedConvos] : undefined;
+                const convFilter = exportSelectedConvos.length > 0 ? exportSelectedConvos : undefined;
                 
                 // 1. Re-query database for the main analytics export
                 const analytics = await loadDatabase(
@@ -264,8 +276,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({
                     }
                 );
                 
-                if (exportSelectedConvos && exportSelectedConvos.length > 0) {
-                    (analytics as any).all_conversations = (analytics as any).all_conversations.filter((c: any) => c.id === exportSelectedConvos);
+                if (exportSelectedConvos.length > 0) {
+                    (analytics as any).all_conversations = (analytics as any).all_conversations.filter((c: any) => exportSelectedConvos.includes(c.id));
                 }
 
                 // 2. Fetch Users
@@ -421,4 +433,3 @@ const AppLayout: React.FC<AppLayoutProps> = ({
 };
 
 export default AppLayout;
-

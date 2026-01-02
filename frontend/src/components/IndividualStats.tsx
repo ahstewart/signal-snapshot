@@ -2,13 +2,10 @@ import * as React from 'react';
 import {
   Box,
   Divider,
-  FormControl,
   Grid,
-  InputLabel,
   List,
   ListItem,
   ListItemText,
-  MenuItem,
   Paper,
   Typography,
   useTheme,
@@ -49,6 +46,8 @@ interface IndividualStatsData {
     emoji: string;
   } | null;
   mostPopularMessage: MostPopularMessage | null;
+  // Added summary field support
+  summary?: string;
 }
 
 interface IndividualStatsProps {
@@ -126,6 +125,32 @@ const IndividualStats: React.FC<IndividualStatsProps> = ({
       {/* Only show stats if a user is selected and data is available */}
       {selectedUser && data && (
         <Box>
+          {/* Summary Section - Displays if summary exists */}
+          {/* Using type assertion to ensure summary property is accessible */}
+          {(data as any).summary && (
+            <Paper 
+                elevation={0}
+                sx={{ 
+                    p: 3, 
+                    mb: 4, 
+                    border: '1px solid', 
+                    borderColor: 'primary.main', 
+                    backgroundColor: 'rgba(25, 118, 210, 0.04)',
+                    borderRadius: 2,
+                }}
+            >
+                <Box sx={{ mb: 2 }}>
+                    <Typography variant="h6" color="primary.main" sx={{ fontWeight: 700 }}>
+                        User Profile
+                    </Typography>
+                </Box>
+                
+                <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.6, color: 'text.primary' }}>
+                    {(data as any).summary}
+                </Typography>
+            </Paper>
+          )}
+
           <Grid container spacing={3}>
             {renderKpiCard('Total Messages Sent', data.totalMessagesSent)}
             {renderKpiCard('Most Popular Day', data.mostPopularDay)}
