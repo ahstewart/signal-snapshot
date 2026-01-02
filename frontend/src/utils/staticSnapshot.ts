@@ -1506,6 +1506,7 @@ const RAW_DATA: RawSnapshotData = {
       "name": "Andrew",
       "stats": {
         "totalMessagesSent": 11236,
+        "summary": "Who is you: The weary, sarcastic sage of the Central Valley who uses this group chat to dissociate from his flat-earther coworkers and the general decline of Western civilization.\nWhat wrong with you: You treat the group chat like a hostage situation where we are forced to learn the riveting intricacies of vinyl decal pricing and the chemical composition of PVC signage. You oscillate wildly between \"whimsical Nintendo adult\" and \"spiraling political doomer\" with zero transition, and your hypochondria is so specific (e.g., fearing an aneurysm while on the toilet) that it’s honestly impressive.\nWhat good about you: You are the creative heartbeat of the group, constantly putting genuine effort into making physical props, maps, and elaborate bits just to bring the boys joy. You’re also emotionally intelligent, an incredibly devoted husband to Jenni, and the one person actually trying to keep the friendship alive despite being stuck in Merced.",
         "mostPopularDay": "Tuesday",
         "totalReactionsSent": 17838,
         "reactedToMost": {

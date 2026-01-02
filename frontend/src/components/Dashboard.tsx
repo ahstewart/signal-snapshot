@@ -27,7 +27,6 @@ import {
 import { Autocomplete, TextField } from '@mui/material';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 
-// Added EmotionUserData to imports
 import { AnalyticsData, Conversation, User, EmotionUserData } from '../utils/database';
 import { PageHeader } from './PageHeader';
 
@@ -112,7 +111,7 @@ const Dashboard: React.FC<DashboardProps> = ({
       <Paper 
         elevation={0}
         sx={{ 
-          p: 3, 
+          p: { xs: 2, sm: 3 }, 
           mt: 3, 
           border: '1px solid', 
           borderColor: 'primary.main', 
@@ -140,7 +139,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             <Chip label="BETA" size="small" color="primary" variant="outlined" sx={{ height: 20, fontSize: '0.65rem' }} />
         </Box>
         
-        <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.6, color: 'text.primary' }}>
+        <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.6, color: 'text.primary', fontSize: { xs: '0.9rem', sm: '1rem' } }}>
           {conversation.summary}
         </Typography>
         
@@ -172,7 +171,7 @@ const Dashboard: React.FC<DashboardProps> = ({
     }
 
     return (
-      <Grid container spacing={3} sx={{ mb: 4 }}>
+      <Grid container spacing={2} sx={{ mb: 4, mt: 1 }}>
         {renderKpiCard('Total Messages', analyticsData?.kpis.total_messages ?? '...')}
         {renderKpiCard('Total Members', totalMembers)}
         {renderKpiCard('Avg Messages / Day', analyticsData?.kpis.avg_messages_per_day ?? '...')}
@@ -182,47 +181,44 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   function renderDailyChart() {
     return (
-      <Paper sx={{ p: 5, height: 400 }}>
+      <Paper sx={{ p: { xs: 2, sm: 5 }, height: { xs: 300, md: 400 }, display: 'flex', flexDirection: 'column' }}>
         <Typography variant="h6" gutterBottom>Daily Message Activity</Typography>
+        <Box sx={{ flexGrow: 1, minHeight: 0 }}>
         {analyticsData?.message_counts?.by_day ? (
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={Object.entries(analyticsData.message_counts.by_day)}>
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="0" />
-              <YAxis />
+              <YAxis width={40} />
               <Tooltip />
-              <Line type="monotone" dataKey="1" stroke="#8884d8" />
+              <Line type="monotone" dataKey="1" stroke="#8884d8" dot={false} />
             </LineChart>
           </ResponsiveContainer>
         ) : <Typography variant="body2" color="text.secondary">No data</Typography>}
+        </Box>
       </Paper>
     );
   }
 
   function renderHourlyChart() {
     // Transform UTC hours to Pacific Time (UTC-7)
-    // We construct a new data array ordered 00:00 PT -> 23:00 PT
     let pacificData: { hour: number; count: number }[] = [];
     
     if (analyticsData?.message_counts?.by_hour) {
       const utcData = analyticsData.message_counts.by_hour;
-      
       for (let h = 0; h < 24; h++) {
         // Pacific Hour 'h' corresponds to UTC Hour '(h + 7)' (wrapping around 24)
-        // e.g., 00:00 PT is 07:00 UTC
         const utcHour = (h + 7) % 24;
-        
-        // Database keys are strings like "07", "12"
         const utcKey = utcHour.toString().padStart(2, '0');
         const count = utcData[utcKey] || 0;
-        
         pacificData.push({ hour: h, count });
       }
     }
 
     return (
-      <Paper sx={{ p: 5, height: 400 }}>
+      <Paper sx={{ p: { xs: 2, sm: 5 }, height: { xs: 300, md: 400 }, display: 'flex', flexDirection: 'column' }}>
         <Typography variant="h6" gutterBottom>Hourly Activity (Pacific Time)</Typography>
+        <Box sx={{ flexGrow: 1, minHeight: 0 }}>
         {pacificData.length > 0 ? (
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={pacificData}>
@@ -233,27 +229,28 @@ const Dashboard: React.FC<DashboardProps> = ({
                 domain={[0, 23]}
                 tickCount={12}
               />
-              <YAxis />
+              <YAxis width={40} />
               <Tooltip labelFormatter={(v) => `${formatHour(v)} PT`} />
               <Line type="monotone" dataKey="count" stroke="#8884d8" />
             </LineChart>
           </ResponsiveContainer>
         ) : <Typography variant="body2" color="text.secondary">No data</Typography>}
+        </Box>
       </Paper>
     );
   }
 
   function renderReactionAnalytics() {
     return (
-      <Grid container spacing={3} sx={{ mt: 4 }}>
+      <Grid container spacing={3} sx={{ mt: 2 }}>
         <Grid item xs={12} md={4}>
-          <Paper sx={{ p: 2, height: '100%', textAlign: 'center' }}>
+          <Paper sx={{ p: 2, height: '100%', textAlign: 'center', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
             <Typography variant="h4" component="div">{analyticsData?.reactions.total_reactions ?? '...'}</Typography>
             <Typography variant="body1" color="text.secondary">Total Reactions</Typography>
           </Paper>
         </Grid>
         <Grid item xs={12} md={8}>
-          <Paper sx={{ p: 2 }}>
+          <Paper sx={{ p: 2, overflowX: 'auto' }}>
             <Typography variant="h6" gutterBottom>Top 10 Emojis</Typography>
             {analyticsData?.reactions?.top_emojis && analyticsData.reactions.top_emojis.length > 0 ? (
               <TableContainer>
@@ -267,7 +264,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                   <TableBody>
                     {analyticsData.reactions.top_emojis.map((reaction: { emoji: string; count: number }) => (
                       <TableRow key={reaction.emoji}>
-                        <TableCell component="th" scope="row">{reaction.emoji}</TableCell>
+                        <TableCell component="th" scope="row" sx={{ fontSize: '1.2rem' }}>{reaction.emoji}</TableCell>
                         <TableCell align="right">{reaction.count}</TableCell>
                       </TableRow>
                     ))}
@@ -297,8 +294,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                     cursor: 'help',
                     width: 'fit-content',
                     mb: 1,
-                    fontWeight: 800, // Bold
-                    color: 'text.secondary' // Lighter color
+                    fontWeight: 800,
+                    color: 'text.secondary'
                 }}
             >
                 {title}
@@ -311,7 +308,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                 component="div" 
                 sx={{ 
                   fontWeight: 800, 
-                  fontSize: '1.5rem',
+                  fontSize: { xs: '1.3rem', md: '1.5rem' },
                   overflowWrap: 'break-word', 
                   my: 0.5, 
                   maxWidth: '100%', 
@@ -345,7 +342,6 @@ const Dashboard: React.FC<DashboardProps> = ({
       most_mentioned: "Most Mentioned",
       most_mentions_made: "Most Mentions Made",
       most_media_sent: "Most Media Sent",
-      // New awards added to the display map
       most_night_owl: "Night Owl",
       most_early_bird: "Early Bird",
       longest_avg_message: "The Rambler",
@@ -361,8 +357,8 @@ const Dashboard: React.FC<DashboardProps> = ({
         most_mentioned: "mentions",
         most_mentions_made: "mentions",
         most_media_sent: "files",
-        most_night_owl: "%", // Percentage
-        most_early_bird: "%", // Percentage
+        most_night_owl: "%", 
+        most_early_bird: "%", 
         longest_avg_message: "chars/msg",
         hottest_newbie: "messages",
         lurker: "reacts/msg",
@@ -386,10 +382,20 @@ const Dashboard: React.FC<DashboardProps> = ({
 
     return (
       <Box sx={{ mt: 4 }}>
-         <Typography variant="h4" sx={{ fontWeight: 'bold', borderLeft: '6px solid #1976d2', pl: 2, mb: 2, color: '#222', background: 'linear-gradient(90deg, #f4f7fa 0%, #e3ecf7 100%)', borderRadius: 2, boxShadow: 1 }}>
+         <Typography variant="h4" sx={{ 
+            fontWeight: 'bold', 
+            borderLeft: '6px solid #1976d2', 
+            pl: 2, 
+            mb: 2, 
+            color: '#222', 
+            background: 'linear-gradient(90deg, #f4f7fa 0%, #e3ecf7 100%)', 
+            borderRadius: 2, 
+            boxShadow: 1,
+            fontSize: { xs: '1.5rem', md: '2.125rem' }
+         }}>
             Awards
          </Typography>
-        <Grid container spacing={3}>
+        <Grid container spacing={2}>
           {Object.entries(analyticsData.awards).map(([key, award]) =>
             renderAwardCard(
               awardDisplayTitles[key as keyof typeof analyticsData.awards] || key,
@@ -415,8 +421,8 @@ const Dashboard: React.FC<DashboardProps> = ({
 
     return (
       <Box sx={{ mt: 4 }}>
-        <Typography variant="h5" gutterBottom>{title}</Typography>
-        <Paper sx={{ p: 2 }}>
+        <Typography variant="h5" gutterBottom sx={{ fontSize: { xs: '1.25rem', md: '1.5rem' } }}>{title}</Typography>
+        <Paper sx={{ p: 0, overflow: 'hidden' }}>
           <TableContainer>
             <Table stickyHeader size="small">
               <TableHead>
@@ -445,15 +451,15 @@ const Dashboard: React.FC<DashboardProps> = ({
   }
 
   return (
-    <Box sx={{ p: 2 }}>
+    <Box sx={{ p: { xs: 1, md: 2 }, overflowX: 'hidden' }}>
       <PageHeader 
         title="Group Chat Analytics"
-        subtitle="Select a group chat to analyze its content and behavior of the members."
+        subtitle="Select a group chat to analyze."
       >
         {analyticsData?.all_conversations && (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%', mt: 2 }}>
             <Autocomplete
-              sx={{ minWidth: 300, mt: { xs: 2, sm: 0 } }}
+              fullWidth
               options={analyticsData.all_conversations.map((convo: Conversation) => convo.id)}
               getOptionLabel={(id) => {
                 const conversation = analyticsData.all_conversations.find((c: Conversation) => c.id === id);
@@ -482,15 +488,14 @@ const Dashboard: React.FC<DashboardProps> = ({
         <Grid item xs={12}>
           {renderDailyChart()}
         </Grid>
-        <Grid item xs={12} sx={{ mb: 5 }}>
+        <Grid item xs={12} sx={{ mb: 2 }}>
            {renderHourlyChart()}
         </Grid>
 
-        <Grid item xs={12} sx={{ mb: 5 }}>
+        <Grid item xs={12} sx={{ mb: 2 }}>
           {renderReactionAnalytics()}
         </Grid>
         
-        {/* Restored Awards and Rankings Sections */}
         <Grid item xs={12}>
           {renderAwards()}
         </Grid>

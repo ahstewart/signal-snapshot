@@ -46,7 +46,6 @@ interface IndividualStatsData {
     emoji: string;
   } | null;
   mostPopularMessage: MostPopularMessage | null;
-  // Added summary field support
   summary?: string;
 }
 
@@ -93,15 +92,15 @@ const IndividualStats: React.FC<IndividualStatsProps> = ({
   }
 
   return (
-    <Box sx={{ p: 4 }}>
+    <Box sx={{ p: { xs: 2, md: 4 } }}>
       <PageHeader 
         title="Individual Statistics"
-        subtitle="Select an individual to analyze their Signal behavior."
+        subtitle="Select an individual to analyze."
       >
         {users.length > 0 && (
           <Autocomplete
             size="medium"
-            sx={{ minWidth: 900, mt: { xs: 2, sm: 0 } }}
+            sx={{ width: '100%', maxWidth: 600, mt: 2 }}
             options={users.map(user => user.id)}
             getOptionLabel={(id) => {
               const user = users.find(u => u.id === id);
@@ -125,13 +124,12 @@ const IndividualStats: React.FC<IndividualStatsProps> = ({
       {/* Only show stats if a user is selected and data is available */}
       {selectedUser && data && (
         <Box>
-          {/* Summary Section - Displays if summary exists */}
-          {/* Using type assertion to ensure summary property is accessible */}
+          {/* Summary Section */}
           {(data as any).summary && (
             <Paper 
                 elevation={0}
                 sx={{ 
-                    p: 3, 
+                    p: { xs: 2, md: 3 }, 
                     mb: 4, 
                     border: '1px solid', 
                     borderColor: 'primary.main', 
@@ -145,7 +143,7 @@ const IndividualStats: React.FC<IndividualStatsProps> = ({
                     </Typography>
                 </Box>
                 
-                <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.6, color: 'text.primary' }}>
+                <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.6, color: 'text.primary', fontSize: { xs: '0.9rem', md: '1rem' } }}>
                     {(data as any).summary}
                 </Typography>
             </Paper>
@@ -159,8 +157,8 @@ const IndividualStats: React.FC<IndividualStatsProps> = ({
             {(data.reactedToMost || data.receivedMostReactionsFrom) && (
               <Grid container spacing={3} justifyContent="center" alignItems="center" sx={{ mt: 2 }}>
                 {data.reactedToMost && (
-                  <Grid item xs={12} md={6} lg={4} sx={{ display: 'flex', justifyContent: 'center' }}>
-                    <Paper sx={{ p: 2, textAlign: 'center', background: 'linear-gradient(135deg, #f4f7fa 70%, #e3ecf7 100%)', boxShadow: 3, borderRadius: 3, border: '1px solid #d6e0ef' }}>
+                  <Grid item xs={12} md={6} lg={4} sx={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
+                    <Paper sx={{ p: 2, textAlign: 'center', background: 'linear-gradient(135deg, #f4f7fa 70%, #e3ecf7 100%)', boxShadow: 3, borderRadius: 3, border: '1px solid #d6e0ef', width: '100%' }}>
                       <Typography variant="h6" color="text.secondary">Reacted To Most</Typography>
                       <Typography variant="h4">{data.reactedToMost.name}</Typography>
                       <Typography variant="body1" color="text.secondary">{data.reactedToMost.count} times</Typography>
@@ -169,8 +167,8 @@ const IndividualStats: React.FC<IndividualStatsProps> = ({
                   </Grid>
                 )}
                 {data.receivedMostReactionsFrom && (
-                  <Grid item xs={12} md={6} lg={4} sx={{ display: 'flex', justifyContent: 'center' }}>
-                    <Paper sx={{ p: 2, textAlign: 'center', background: 'linear-gradient(135deg, #f4f7fa 70%, #e3ecf7 100%)', boxShadow: 3, borderRadius: 3, border: '1px solid #d6e0ef' }}>
+                  <Grid item xs={12} md={6} lg={4} sx={{ display: 'flex', justifyContent: 'center', width: '100%' }}>
+                    <Paper sx={{ p: 2, textAlign: 'center', background: 'linear-gradient(135deg, #f4f7fa 70%, #e3ecf7 100%)', boxShadow: 3, borderRadius: 3, border: '1px solid #d6e0ef', width: '100%' }}>
                       <Typography variant="h6" color="text.secondary">Received Most Reactions From</Typography>
                       <Typography variant="h4">{data.receivedMostReactionsFrom.name}</Typography>
                       <Typography variant="body1" color="text.secondary">{data.receivedMostReactionsFrom.count} times</Typography>
@@ -186,7 +184,7 @@ const IndividualStats: React.FC<IndividualStatsProps> = ({
             <Grid item sx={{ display: 'flex', justifyContent: 'center', mt: 4, width: '100%' }}>
               <Paper 
                 sx={{ 
-                  p: 4, 
+                  p: { xs: 2, md: 4 }, 
                   width: '100%',
                   maxWidth: '800px',
                   background: theme.palette.background.paper,
@@ -209,7 +207,7 @@ const IndividualStats: React.FC<IndividualStatsProps> = ({
                     borderLeft: `4px solid ${theme.palette.primary.main}`
                   }}
                 >
-                  <Typography variant="body1" sx={{ fontStyle: 'italic' }}>
+                  <Typography variant="body1" sx={{ fontStyle: 'italic', fontSize: { xs: '0.9rem', md: '1rem' } }}>
                     "{data.mostPopularMessage.text || 'Media message'}"
                   </Typography>
                 </Box>
