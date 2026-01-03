@@ -26,9 +26,44 @@ export function createDashboardHtml(analyticsData: AnalyticsData): string {
     <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.23.6/babel.min.js"></script>
 
     <style>
-        body { margin: 0; background-color: #f5f5f5; }
+        * { box-sizing: border-box; }
+        body { 
+            margin: 0; 
+            background-color: #f5f5f5; 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
         #root { min-height: 100vh; display: flex; flex-direction: column; }
         .recharts-wrapper { width: 100% !important; }
+        
+        /* Mobile responsive styles */
+        @media (max-width: 768px) {
+            .MuiContainer-root { padding: 8px !important; }
+            .MuiTypography-h4 { font-size: 1.5rem !important; }
+            .MuiTypography-h5 { font-size: 1.25rem !important; }
+            .MuiTypography-h6 { font-size: 1rem !important; }
+            .MuiPaper-root { padding: 8px !important; }
+            .MuiTable-root { font-size: 0.75rem !important; }
+            .MuiTableCell-root { padding: 8px !important; font-size: 0.75rem !important; }
+            .MuiButton-root { font-size: 0.875rem !important; padding: 6px 12px !important; }
+            .MuiTabs-root { font-size: 0.875rem !important; }
+            .MuiTab-root { min-width: 80px !important; font-size: 0.875rem !important; padding: 8px 12px !important; }
+            .MuiAutocomplete-root { width: 100% !important; }
+            .MuiTextField-root { width: 100% !important; }
+            .MuiGrid-container { margin: -4px !important; }
+            .MuiGrid-item { padding: 4px !important; }
+            .MuiToolbar-root { min-height: 56px !important; padding: 0 8px !important; }
+            .MuiAppBar-root .MuiTypography-h6 { font-size: 1rem !important; }
+        }
+        
+        @media (max-width: 480px) {
+            .MuiTypography-h4 { font-size: 1.25rem !important; }
+            .MuiTypography-h5 { font-size: 1rem !important; }
+            .MuiPaper-root { padding: 4px !important; }
+            .MuiTable-root { font-size: 0.7rem !important; }
+            .MuiTableCell-root { padding: 4px !important; font-size: 0.7rem !important; }
+        }
     </style>
 </head>
 <body>
@@ -66,12 +101,12 @@ export function createDashboardHtml(analyticsData: AnalyticsData): string {
 
         // --- Shared Components ---
         const PageHeader = ({ title, subtitle, children }) => (
-            <Box sx={{ mb: 4, pb: 2, borderBottom: '1px solid rgba(0, 0, 0, 0.12)' }}>
+            <Box sx={{ mb: { xs: 2, md: 4 }, pb: 2, borderBottom: '1px solid rgba(0, 0, 0, 0.12)' }}>
                 <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', md: 'center' }, gap: 2, mb: 1 }}>
-                    <Typography variant="h4" component="h1" sx={{ fontWeight: 700, color: '#1976d2' }}>{title}</Typography>
+                    <Typography variant="h4" component="h1" sx={{ fontWeight: 700, color: '#1976d2', fontSize: { xs: '1.5rem', md: '2.125rem' } }}>{title}</Typography>
                     {children}
                 </Box>
-                {subtitle && <Typography variant="subtitle1" color="text.secondary">{subtitle}</Typography>}
+                {subtitle && <Typography variant="subtitle1" color="text.secondary" sx={{ fontSize: { xs: '0.875rem', md: '1rem' } }}>{subtitle}</Typography>}
             </Box>
         );
 
@@ -116,19 +151,19 @@ export function createDashboardHtml(analyticsData: AnalyticsData): string {
 
             const KpiCard = ({ title, value }) => (
                 <Grid item xs={12} sm={4}>
-                    <Paper sx={{ p: 2, textAlign: 'center', background: 'linear-gradient(135deg, #f4f7fa 70%, #e3ecf7 100%)', boxShadow: 3, borderRadius: 3, border: '1px solid #d6e0ef' }}>
-                        <Typography variant="h4" component="div">{value}</Typography>
-                        <Typography variant="body1" color="text.secondary">{title}</Typography>
+                    <Paper sx={{ p: { xs: 1.5, md: 2 }, textAlign: 'center', background: 'linear-gradient(135deg, #f4f7fa 70%, #e3ecf7 100%)', boxShadow: 3, borderRadius: 3, border: '1px solid #d6e0ef' }}>
+                        <Typography variant="h4" component="div" sx={{ fontSize: { xs: '1.75rem', md: '2.125rem' } }}>{value}</Typography>
+                        <Typography variant="body1" color="text.secondary" sx={{ fontSize: { xs: '0.875rem', md: '1rem' } }}>{title}</Typography>
                     </Paper>
                 </Grid>
             );
 
             return (
-                <Box sx={{ p: 3 }}>
+                <Box sx={{ p: { xs: 1, md: 3 } }}>
                     <PageHeader title="Individual Statistics" subtitle="Select an individual to analyze their Signal behavior.">
                          <Autocomplete
                             size="small"
-                            sx={{ minWidth: 300 }}
+                            sx={{ minWidth: { xs: '100%', md: 300 }, width: { xs: '100%', md: 'auto' } }}
                             options={users}
                             getOptionLabel={(user) => user.name || user.id}
                             value={selectedUser}
@@ -213,18 +248,25 @@ export function createDashboardHtml(analyticsData: AnalyticsData): string {
                 if (!rankingData || rankingData.length === 0) return null;
                 return (
                     <Box sx={{ mt: 4 }}>
-                        <Typography variant="h5" gutterBottom>{title}</Typography>
+                        <Typography variant="h5" gutterBottom sx={{ fontSize: { xs: '1.25rem', md: '1.5rem' } }}>{title}</Typography>
                         <Paper sx={{ p: 2, overflowX: 'auto' }}>
-                            <TableContainer>
-                                <Table size="small">
-                                    <TableHead><TableRow><TableCell sx={{ fontWeight: 'bold' }}>User</TableCell><TableCell align="right" sx={{ fontWeight: 'bold' }}>{totalReactsLabel}</TableCell><TableCell align="right" sx={{ fontWeight: 'bold' }}>Rate</TableCell><TableCell align="right" sx={{ fontWeight: 'bold' }}>{scoreLabel}</TableCell></TableRow></TableHead>
+                            <TableContainer sx={{ maxHeight: { xs: 400, md: 'none' }, overflowX: 'auto' }}>
+                                <Table size="small" sx={{ minWidth: { xs: 400, md: 650 } }}>
+                                    <TableHead>
+                                        <TableRow>
+                                            <TableCell sx={{ fontWeight: 'bold', fontSize: { xs: '0.75rem', md: '0.875rem' }, whiteSpace: 'nowrap' }}>User</TableCell>
+                                            <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: { xs: '0.75rem', md: '0.875rem' }, whiteSpace: 'nowrap' }}>{totalReactsLabel}</TableCell>
+                                            <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: { xs: '0.75rem', md: '0.875rem' }, whiteSpace: 'nowrap' }}>Rate</TableCell>
+                                            <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: { xs: '0.75rem', md: '0.875rem' }, whiteSpace: 'nowrap' }}>{scoreLabel}</TableCell>
+                                        </TableRow>
+                                    </TableHead>
                                     <TableBody>
                                         {rankingData.slice(0, 10).map((user) => (
                                             <TableRow key={user.name}>
-                                                <TableCell component="th" scope="row">{user.name}</TableCell>
-                                                <TableCell align="right">{user.totalReacts}</TableCell>
-                                                <TableCell align="right">{user.rate.toFixed(3)}</TableCell>
-                                                <TableCell align="right">{user.score.toFixed(3)}</TableCell>
+                                                <TableCell component="th" scope="row" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>{user.name}</TableCell>
+                                                <TableCell align="right" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>{user.totalReacts}</TableCell>
+                                                <TableCell align="right" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>{user.rate.toFixed(3)}</TableCell>
+                                                <TableCell align="right" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>{user.score.toFixed(3)}</TableCell>
                                             </TableRow>
                                         ))}
                                     </TableBody>
@@ -236,12 +278,25 @@ export function createDashboardHtml(analyticsData: AnalyticsData): string {
             };
 
             // Simplified chart renders for export
-            const renderDailyChart = () => (
-                <Paper sx={{ p: 5, height: 400 }}>
-                    <Typography variant="h6" gutterBottom>Daily Message Activity</Typography>
-                    <ResponsiveContainer width="100%" height="100%"><LineChart data={Object.entries(analyticsData.message_counts.by_day).map(([d, c]) => ({ date: d, count: c }))}><CartesianGrid strokeDasharray="3 3" /><XAxis dataKey="date" /><YAxis /><Tooltip /><Line type="monotone" dataKey="count" stroke="#8884d8" dot={false} /></LineChart></ResponsiveContainer>
-                </Paper>
-            );
+            const renderDailyChart = () => {
+                const isMobile = window.innerWidth < 768;
+                return (
+                    <Paper sx={{ p: { xs: 2, md: 5 }, height: { xs: 300, md: 400 }, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                        <Typography variant="h6" gutterBottom sx={{ fontSize: { xs: '1rem', md: '1.25rem' } }}>Daily Message Activity</Typography>
+                        <Box sx={{ flexGrow: 1, minHeight: 0, width: '100%' }}>
+                            <ResponsiveContainer width="100%" height="100%">
+                                <LineChart data={Object.entries(analyticsData.message_counts.by_day).map(([d, c]) => ({ date: d, count: c }))} margin={{ top: 5, right: isMobile ? 5 : 20, bottom: isMobile ? 60 : 0, left: isMobile ? -20 : 0 }}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis dataKey="date" angle={-45} textAnchor="end" height={60} tick={{ fontSize: isMobile ? 10 : 12 }} />
+                                    <YAxis width={40} tick={{ fontSize: isMobile ? 10 : 12 }} />
+                                    <Tooltip />
+                                    <Line type="monotone" dataKey="count" stroke="#8884d8" dot={false} strokeWidth={2} />
+                                </LineChart>
+                            </ResponsiveContainer>
+                        </Box>
+                    </Paper>
+                );
+            };
 
             const renderHourlyChart = () => {
                 let pacificData = [];
@@ -253,17 +308,27 @@ export function createDashboardHtml(analyticsData: AnalyticsData): string {
                         pacificData.push({ hour: h, count: utcData[utcKey] || 0 });
                     }
                 }
+                const isMobile = window.innerWidth < 768;
                 return (
-                    <Paper sx={{ p: 5, height: 400 }}>
-                        <Typography variant="h6" gutterBottom>Hourly Activity (Pacific Time)</Typography>
-                        <ResponsiveContainer width="100%" height="100%"><LineChart data={pacificData}><XAxis dataKey="hour" tickFormatter={(v) => formatHour(parseInt(v, 10))} type="number" domain={[0, 23]} tickCount={12} /><YAxis /><Tooltip labelFormatter={(v) => \`\${formatHour(v)} PT\`} /><Line type="monotone" dataKey="count" stroke="#8884d8" dot={false} /></LineChart></ResponsiveContainer>
+                    <Paper sx={{ p: { xs: 2, md: 5 }, height: { xs: 300, md: 400 }, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                        <Typography variant="h6" gutterBottom sx={{ fontSize: { xs: '1rem', md: '1.25rem' } }}>Hourly Activity (Pacific Time)</Typography>
+                        <Box sx={{ flexGrow: 1, minHeight: 0, width: '100%' }}>
+                            <ResponsiveContainer width="100%" height="100%">
+                                <LineChart data={pacificData} margin={{ top: 5, right: isMobile ? 5 : 20, bottom: isMobile ? 20 : 0, left: isMobile ? -20 : 0 }}>
+                                    <XAxis dataKey="hour" tickFormatter={(v) => formatHour(parseInt(v, 10))} type="number" domain={[0, 23]} tickCount={12} tick={{ fontSize: isMobile ? 10 : 12 }} />
+                                    <YAxis width={40} tick={{ fontSize: isMobile ? 10 : 12 }} />
+                                    <Tooltip labelFormatter={(v) => \`\${formatHour(v)} PT\`} />
+                                    <Line type="monotone" dataKey="count" stroke="#8884d8" dot={false} strokeWidth={2} />
+                                </LineChart>
+                            </ResponsiveContainer>
+                        </Box>
                     </Paper>
                 );
             };
 
             return (
-                <Box sx={{ p: 2 }}>
-                    <Box sx={{ mb: 4, display: 'flex', alignItems: 'center', gap: 2 }}>
+                <Box sx={{ p: { xs: 1, md: 2 }, overflowX: 'hidden', width: '100%' }}>
+                    <Box sx={{ mb: { xs: 2, md: 4 }, display: 'flex', alignItems: 'center', gap: 2, flexDirection: { xs: 'column', md: 'row' } }}>
                         {analyticsData.all_conversations && (
                             <Autocomplete
                                 options={analyticsData.all_conversations}
@@ -272,7 +337,7 @@ export function createDashboardHtml(analyticsData: AnalyticsData): string {
                                 onChange={handleConversationChange}
                                 renderInput={(params) => <TextField {...params} label="Filter by Group Chat" variant="outlined" size="medium" />}
                                 isOptionEqualToValue={(option, value) => option.id === value.id}
-                                sx={{ minWidth: 300, flexGrow: 1 }}
+                                sx={{ minWidth: { xs: '100%', md: 300 }, flexGrow: 1, width: { xs: '100%', md: 'auto' } }}
                             />
                         )}
                     </Box>
@@ -300,15 +365,15 @@ export function createDashboardHtml(analyticsData: AnalyticsData): string {
                 <ThemeProvider theme={theme}>
                     <CssBaseline />
                     <AppBar position="static">
-                        <Toolbar>
-                            <Typography variant="h6" sx={{ flexGrow: 1 }}>Signal Snapshot Export</Typography>
+                        <Toolbar sx={{ minHeight: { xs: '56px', md: '64px' }, padding: { xs: '0 8px', md: '0 16px' } }}>
+                            <Typography variant="h6" sx={{ flexGrow: 1, fontSize: { xs: '1rem', md: '1.25rem' } }}>Signal Snapshot Export</Typography>
                         </Toolbar>
-                        <Tabs value={currentTab} onChange={(_, v) => setCurrentTab(v)} textColor="inherit" indicatorColor="secondary" centered>
-                            <Tab label="Group Chats" />
-                            <Tab label="Individual Stats" />
+                        <Tabs value={currentTab} onChange={(_, v) => setCurrentTab(v)} textColor="inherit" indicatorColor="secondary" centered sx={{ fontSize: { xs: '0.875rem', md: '1rem' } }}>
+                            <Tab label="Group Chats" sx={{ fontSize: { xs: '0.875rem', md: '1rem' }, minWidth: { xs: 80, md: 120 }, padding: { xs: '8px 12px', md: '12px 16px' } }} />
+                            <Tab label="Individual Stats" sx={{ fontSize: { xs: '0.875rem', md: '1rem' }, minWidth: { xs: 80, md: 120 }, padding: { xs: '8px 12px', md: '12px 16px' } }} />
                         </Tabs>
                     </AppBar>
-                    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
+                    <Container maxWidth="lg" sx={{ mt: { xs: 2, md: 4 }, mb: { xs: 2, md: 4 }, px: { xs: 1, md: 3 } }}>
                         {currentTab === 0 && <Dashboard data={window.analyticsData} />}
                         {currentTab === 1 && <IndividualStats data={window.analyticsData} />}
                     </Container>

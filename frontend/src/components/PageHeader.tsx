@@ -40,6 +40,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({ title, subtitle, childre
             backgroundClip: 'text',
             textFillColor: 'transparent',
             display: 'inline-block',
+            fontSize: { xs: '1.5rem', sm: '2rem', md: '2.125rem' },
           }}
         >
           {title}
@@ -53,6 +54,7 @@ export const PageHeader: React.FC<PageHeaderProps> = ({ title, subtitle, childre
           sx={{
             maxWidth: '800px',
             lineHeight: 1.6,
+            fontSize: { xs: '0.875rem', md: '1rem' },
           }}
         >
           {subtitle}

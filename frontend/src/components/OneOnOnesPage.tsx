@@ -172,22 +172,22 @@ const OneOnOnesPage: React.FC<OneOnOnesPageProps> = ({
 
     const renderKpiCard = (title: string, value: string | number) => (
         <Grid item xs={12} sm={6} md={3}>
-            <Paper sx={{ p: 2, textAlign: 'center', background: 'linear-gradient(135deg, #f4f7fa 70%, #e3ecf7 100%)', boxShadow: 3, borderRadius: 3, border: '1px solid #d6e0ef' }}>
-                <Typography variant="h4" component="div">{value}</Typography>
-                <Typography variant="body1" color="text.secondary">{title}</Typography>
+            <Paper sx={{ p: { xs: 1.5, md: 2 }, textAlign: 'center', background: 'linear-gradient(135deg, #f4f7fa 70%, #e3ecf7 100%)', boxShadow: 3, borderRadius: 3, border: '1px solid #d6e0ef' }}>
+                <Typography variant="h4" component="div" sx={{ fontSize: { xs: '1.75rem', md: '2.125rem' } }}>{value}</Typography>
+                <Typography variant="body1" color="text.secondary" sx={{ fontSize: { xs: '0.875rem', md: '1rem' } }}>{title}</Typography>
             </Paper>
         </Grid>
     );
 
     return (
-        <Box sx={{ p: 3 }}>
+        <Box sx={{ p: { xs: 1, md: 3 } }}>
             <PageHeader 
                 title="1:1 Conversations"
                 subtitle="Select a one-on-one conversation to analyze your relationship."
             >
                 <Autocomplete
                     size="medium"
-                    sx={{ minWidth: 900, mt: { xs: 2, sm: 0 } }}
+                    sx={{ width: '100%', maxWidth: { xs: '100%', md: 900 }, mt: { xs: 1, md: 0 } }}
                     options={privateConversations.map(c => c.id)}
                     getOptionLabel={id => {
                         const convo = privateConversations.find(c => c.id === id);
@@ -203,6 +203,7 @@ const OneOnOnesPage: React.FC<OneOnOnesPageProps> = ({
                             label="Select Conversation" 
                             variant="outlined"
                             size="medium"
+                            sx={{ fontSize: { xs: '0.875rem', md: '1rem' } }}
                         />
                     )}
                     isOptionEqualToValue={(option, value) => option === value}
@@ -231,8 +232,8 @@ const OneOnOnesPage: React.FC<OneOnOnesPageProps> = ({
                             </Grid>
                             {/* Two-column user stats comparison widget */}
 {selectedConversation && (
-  <Paper sx={{ p: 3, mt: 2 }}>
-    <Typography variant="h6" gutterBottom>
+  <Paper sx={{ p: { xs: 2, md: 3 }, mt: 2 }}>
+    <Typography variant="h6" gutterBottom sx={{ fontSize: { xs: '1rem', md: '1.25rem' } }}>
       User Stats Comparison
     </Typography>
     <UserStatsComparison

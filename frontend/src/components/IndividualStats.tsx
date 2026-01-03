@@ -75,9 +75,9 @@ const IndividualStats: React.FC<IndividualStatsProps> = ({
   const renderKpiCard = (title: string, value: string | number) => {
     return (
       <Grid item xs={12} sm={4}>
-        <Paper sx={{ p: 2, textAlign: 'center', background: 'linear-gradient(135deg, #f4f7fa 70%, #e3ecf7 100%)', boxShadow: 3, borderRadius: 3, border: '1px solid #d6e0ef' }}>
-          <Typography variant="h4" component="div">{value}</Typography>
-          <Typography variant="body1" color="text.secondary">{title}</Typography>
+        <Paper sx={{ p: { xs: 1.5, md: 2 }, textAlign: 'center', background: 'linear-gradient(135deg, #f4f7fa 70%, #e3ecf7 100%)', boxShadow: 3, borderRadius: 3, border: '1px solid #d6e0ef' }}>
+          <Typography variant="h4" component="div" sx={{ fontSize: { xs: '1.75rem', md: '2.125rem' } }}>{value}</Typography>
+          <Typography variant="body1" color="text.secondary" sx={{ fontSize: { xs: '0.875rem', md: '1rem' } }}>{title}</Typography>
         </Paper>
       </Grid>
     );
@@ -100,7 +100,7 @@ const IndividualStats: React.FC<IndividualStatsProps> = ({
         {users.length > 0 && (
           <Autocomplete
             size="medium"
-            sx={{ width: '100%', maxWidth: 600, mt: 2 }}
+            sx={{ width: '100%', maxWidth: { xs: '100%', md: 600 }, mt: { xs: 1, md: 2 } }}
             options={users.map(user => user.id)}
             getOptionLabel={(id) => {
               const user = users.find(u => u.id === id);
@@ -114,6 +114,7 @@ const IndividualStats: React.FC<IndividualStatsProps> = ({
                 label="Select User" 
                 variant="outlined"
                 size="medium"
+                sx={{ fontSize: { xs: '0.875rem', md: '1rem' } }}
               />
             )}
             isOptionEqualToValue={(option, value) => option === value}

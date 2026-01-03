@@ -27,25 +27,25 @@ const SummaryPage: React.FC<SummaryPageProps> = ({ data, loading, error, users }
 
     return (
       <Box sx={{ mt: 4 }}>
-        <Typography variant="h6" gutterBottom>
+        <Typography variant="h6" gutterBottom sx={{ fontSize: { xs: '1rem', md: '1.25rem' } }}>
           {title}
         </Typography>
         <Paper sx={{ p: 2 }}>
-          <TableContainer>
-            <Table stickyHeader size="small">
+          <TableContainer sx={{ maxHeight: { xs: 400, md: 'none' }, overflowX: 'auto' }}>
+            <Table stickyHeader size="small" sx={{ minWidth: { xs: 300, md: 400 } }}>
               <TableHead>
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 'bold' }}>User</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 'bold' }}>{countLabel}</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', fontSize: { xs: '0.75rem', md: '0.875rem' } }}>User</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: { xs: '0.75rem', md: '0.875rem' } }}>{countLabel}</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {data.map((user: UserActivity) => (
                   <TableRow key={user.name}>
-                    <TableCell component="th" scope="row">
+                    <TableCell component="th" scope="row" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>
                       {user.name}
                     </TableCell>
-                    <TableCell align="right">{user.count}</TableCell>
+                    <TableCell align="right" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>{user.count}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -66,7 +66,7 @@ const SummaryPage: React.FC<SummaryPageProps> = ({ data, loading, error, users }
     );
 
     return (
-        <Box sx={{ p: 3 }}>
+        <Box sx={{ p: { xs: 1, md: 3 } }}>
             {data && (
                 <PageHeader 
                     title="Signal Snapshot Dashboard"
@@ -90,24 +90,24 @@ const SummaryPage: React.FC<SummaryPageProps> = ({ data, loading, error, users }
                         {renderKpiCard('Total Conversations', data.kpis.total_conversations)}
                         {renderKpiCard('Total Users', users.length)}
                     </Grid>
-                    <Paper sx={{ p: 3, mt: 2 }}>
-                        <Typography variant="h6" gutterBottom>
+                    <Paper sx={{ p: { xs: 2, md: 3 }, mt: 2 }}>
+                        <Typography variant="h6" gutterBottom sx={{ fontSize: { xs: '1rem', md: '1.25rem' } }}>
                             Top Conversations by Message Count
                         </Typography>
                         {data.top_conversations && data.top_conversations.length > 0 ? (
-                            <TableContainer>
-                                <Table size="small">
+                            <TableContainer sx={{ maxHeight: { xs: 400, md: 'none' }, overflowX: 'auto' }}>
+                                <Table size="small" sx={{ minWidth: { xs: 300, md: 400 } }}>
                                     <TableHead>
                                         <TableRow>
-                                            <TableCell sx={{ fontWeight: 'bold' }}>Conversation</TableCell>
-                                            <TableCell align="right" sx={{ fontWeight: 'bold' }}>Messages</TableCell>
+                                            <TableCell sx={{ fontWeight: 'bold', fontSize: { xs: '0.75rem', md: '0.875rem' } }}>Conversation</TableCell>
+                                            <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: { xs: '0.75rem', md: '0.875rem' } }}>Messages</TableCell>
                                         </TableRow>
                                     </TableHead>
                                     <TableBody>
                                         {data.top_conversations.map((convo) => (
                                             <TableRow key={convo.name}>
-                                                <TableCell>{convo.name}</TableCell>
-                                                <TableCell align="right">{convo.count}</TableCell>
+                                                <TableCell sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>{convo.name}</TableCell>
+                                                <TableCell align="right" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>{convo.count}</TableCell>
                                             </TableRow>
                                         ))}
                                     </TableBody>

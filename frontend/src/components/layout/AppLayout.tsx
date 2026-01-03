@@ -25,7 +25,10 @@ import {
   FormControl, 
   InputLabel, 
   CircularProgress, 
-  Tooltip 
+  Tooltip,
+  useTheme,
+  useMediaQuery,
+  Menu
 } from '@mui/material';
 import { AnalyticsData, loadDatabase, loadIndividualStats, loadUsers } from '../../utils/database';
 import { createDashboardHtml } from '../../utils/export';
@@ -36,6 +39,7 @@ import ChatIcon from '@mui/icons-material/Chat';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import CloseIcon from '@mui/icons-material/Close';
 import GitHubIcon from '@mui/icons-material/GitHub';
+import MenuIcon from '@mui/icons-material/Menu';
 
 interface AppLayoutProps {
   dbBuffer: ArrayBuffer | null;
@@ -65,7 +69,11 @@ const AppLayout: React.FC<AppLayoutProps> = ({
   basePath = '/app', 
 }) => {
   const location = useLocation();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [welcomeOpen, setWelcomeOpen] = useState(showWelcome);
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+  const [mobileMenuAnchor, setMobileMenuAnchor] = useState<null | HTMLElement>(null);
   
   // Export dialog state
   const [exportOpen, setExportOpen] = useState(false);
@@ -84,6 +92,18 @@ const AppLayout: React.FC<AppLayoutProps> = ({
   const handleWelcomeClose = () => {
     setWelcomeOpen(false);
     onCloseWelcome();
+  };
+
+  const handleMobileMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+    setMobileMenuAnchor(event.currentTarget);
+  };
+
+  const handleMobileMenuClose = () => {
+    setMobileMenuAnchor(null);
+  };
+
+  const handleDrawerToggle = () => {
+    setMobileDrawerOpen(!mobileDrawerOpen);
   };
 
   const isSnapshotMode = basePath !== '/app';
@@ -105,81 +125,133 @@ const AppLayout: React.FC<AppLayoutProps> = ({
     <Box sx={{ display: 'flex', minHeight: '100vh' }}>
       <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
         <Toolbar>
+          {isMobile && (
+            <IconButton
+              color="inherit"
+              aria-label="open drawer"
+              edge="start"
+              onClick={handleDrawerToggle}
+              sx={{ mr: 2 }}
+            >
+              <MenuIcon />
+            </IconButton>
+          )}
           <Typography 
             variant="h6" 
             component={Link} 
             to="/"
             sx={{ 
               fontWeight: 'bold', 
-              mr: 3, 
+              mr: { xs: 1, md: 3 }, 
               color: 'inherit',
               textDecoration: 'none',
+              fontSize: { xs: '1rem', sm: '1.25rem' },
               '&:hover': { textDecoration: 'none', cursor: 'pointer', opacity: 0.9 }
             }}
           >
-            Signal Snapshot {isSnapshotMode && '(Units 2025)'}
+            Signal Snapshot {isSnapshotMode && isMobile ? '' : isSnapshotMode ? '(Units 2025)' : ''}
           </Typography>
           <Box sx={{ flexGrow: 1 }} />
           
-          <IconButton color="inherit" onClick={handleWelcomeOpen} aria-label="About Signal Snapshot" sx={{ mr: 1 }}>
-            <HelpOutlineIcon />
-          </IconButton>
-
-          {dbBuffer && !isSnapshotMode && (
+          {isMobile ? (
             <>
-              <Tooltip title={currentDbName}>
-                <Typography 
-                  variant="body2" 
-                  component="div" 
-                  sx={{ 
-                    color: 'rgba(255, 255, 255, 0.7)',
-                    fontFamily: 'monospace',
-                    fontSize: '0.8rem',
-                    maxWidth: '200px',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    mr: 1
-                  }}
-                >
-                  {currentDbName}
-                </Typography>
-              </Tooltip>
-              
-              <input
-                type="file"
-                accept=".db,.sqlite,.sqlite3"
-                onChange={onFileChange}
-                style={{ display: 'none' }}
-                id="change-db-input"
-                key={currentDbName}
-              />
-              <Button 
-                variant="contained"
-                color="primary"
-                onClick={() => document.getElementById('change-db-input')?.click()}
-                sx={{
-                  ml: 2,
-                  backgroundColor: 'white',
-                  color: 'primary.main',
-                  '&:hover': {
-                    backgroundColor: '#f5f5f5',
-                    boxShadow: '0px 2px 4px -1px rgba(0,0,0,0.2), 0px 4px 5px 0px rgba(0,0,0,0.14), 0px 1px 10px 0px rgba(0,0,0,0.12)'
-                  },
-                  textTransform: 'none',
-                  fontWeight: 500
+              <IconButton color="inherit" onClick={handleMobileMenuOpen} aria-label="Menu">
+                <MenuIcon />
+              </IconButton>
+              <Menu
+                anchorEl={mobileMenuAnchor}
+                open={Boolean(mobileMenuAnchor)}
+                onClose={handleMobileMenuClose}
+                anchorOrigin={{
+                  vertical: 'bottom',
+                  horizontal: 'right',
+                }}
+                transformOrigin={{
+                  vertical: 'top',
+                  horizontal: 'right',
                 }}
               >
-                Change Data Source
-              </Button>
-              <Button
-                variant="outlined"
-                color="inherit"
-                sx={{ ml: 2, borderColor: 'rgba(255,255,255,0.5)', color: 'white' }}
-                onClick={() => setExportOpen(true)}
-              >
-                Export
-              </Button>
+                <MenuItem onClick={() => { handleWelcomeOpen(); handleMobileMenuClose(); }}>
+                  <HelpOutlineIcon sx={{ mr: 1 }} />
+                  About
+                </MenuItem>
+                {dbBuffer && !isSnapshotMode && (
+                  <>
+                    <MenuItem onClick={() => { document.getElementById('change-db-input')?.click(); handleMobileMenuClose(); }}>
+                      Change Data Source
+                    </MenuItem>
+                    <MenuItem onClick={() => { setExportOpen(true); handleMobileMenuClose(); }}>
+                      Export
+                    </MenuItem>
+                  </>
+                )}
+              </Menu>
+            </>
+          ) : (
+            <>
+              <IconButton color="inherit" onClick={handleWelcomeOpen} aria-label="About Signal Snapshot" sx={{ mr: 1 }}>
+                <HelpOutlineIcon />
+              </IconButton>
+
+              {dbBuffer && !isSnapshotMode && (
+                <>
+                  <Tooltip title={currentDbName}>
+                    <Typography 
+                      variant="body2" 
+                      component="div" 
+                      sx={{ 
+                        color: 'rgba(255, 255, 255, 0.7)',
+                        fontFamily: 'monospace',
+                        fontSize: '0.8rem',
+                        maxWidth: '200px',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        mr: 1
+                      }}
+                    >
+                      {currentDbName}
+                    </Typography>
+                  </Tooltip>
+                  
+                  <input
+                    type="file"
+                    accept=".db,.sqlite,.sqlite3"
+                    onChange={onFileChange}
+                    style={{ display: 'none' }}
+                    id="change-db-input"
+                    key={currentDbName}
+                  />
+                  <Button 
+                    variant="contained"
+                    color="primary"
+                    onClick={() => document.getElementById('change-db-input')?.click()}
+                    sx={{
+                      ml: 2,
+                      backgroundColor: 'white',
+                      color: 'primary.main',
+                      '&:hover': {
+                        backgroundColor: '#f5f5f5',
+                        boxShadow: '0px 2px 4px -1px rgba(0,0,0,0.2), 0px 4px 5px 0px rgba(0,0,0,0.14), 0px 1px 10px 0px rgba(0,0,0,0.12)'
+                      },
+                      textTransform: 'none',
+                      fontWeight: 500,
+                      fontSize: { xs: '0.75rem', sm: '0.875rem' },
+                      px: { xs: 1, sm: 2 }
+                    }}
+                  >
+                    Change Data Source
+                  </Button>
+                  <Button
+                    variant="outlined"
+                    color="inherit"
+                    sx={{ ml: 2, borderColor: 'rgba(255,255,255,0.5)', color: 'white', fontSize: { xs: '0.75rem', sm: '0.875rem' }, px: { xs: 1, sm: 2 } }}
+                    onClick={() => setExportOpen(true)}
+                  >
+                    Export
+                  </Button>
+                </>
+              )}
             </>
           )}
         </Toolbar>
@@ -386,13 +458,49 @@ const AppLayout: React.FC<AppLayoutProps> = ({
       </Dialog>
 
       {/* Sidebar Navigation */}
-      <Drawer variant="permanent" sx={{ width: drawerWidth, flexShrink: 0, height: 'calc(100vh - 40px)', [`& .MuiDrawer-paper`]: { width: drawerWidth, boxSizing: 'border-box', marginTop: '64px', height: 'calc(100vh - 40px)', backgroundColor: '#f5f5f5', borderRight: '1px solid rgba(0, 0, 0, 0.12)' } }}>
+      <Drawer 
+        variant={isMobile ? "temporary" : "permanent"}
+        open={isMobile ? mobileDrawerOpen : true}
+        onClose={handleDrawerToggle}
+        ModalProps={{
+          keepMounted: true, // Better open performance on mobile.
+        }}
+        sx={{ 
+          width: drawerWidth, 
+          flexShrink: 0,
+          [`& .MuiDrawer-paper`]: { 
+            width: drawerWidth, 
+            boxSizing: 'border-box', 
+            marginTop: isMobile ? 0 : '64px', 
+            height: isMobile ? '100vh' : 'calc(100vh - 40px)', 
+            backgroundColor: '#f5f5f5', 
+            borderRight: '1px solid rgba(0, 0, 0, 0.12)' 
+          } 
+        }}
+      >
+        {isMobile && (
+          <Toolbar>
+            <Typography variant="h6" sx={{ flexGrow: 1 }}>
+              Menu
+            </Typography>
+            <IconButton onClick={handleDrawerToggle}>
+              <CloseIcon />
+            </IconButton>
+          </Toolbar>
+        )}
         <List>
           {menuItems.map((item) => {
              const isActive = location.pathname === item.path || location.pathname === item.path + '/';
              return (
               <ListItem key={item.text} disablePadding>
-                <ListItemButton component={Link} to={item.path} selected={isActive} disabled={!dbBuffer && !isSnapshotMode} sx={isActive ? { backgroundColor: '#e3ecf7', fontWeight: 600 } : {}}>
+                <ListItemButton 
+                  component={Link} 
+                  to={item.path} 
+                  selected={isActive} 
+                  disabled={!dbBuffer && !isSnapshotMode} 
+                  onClick={() => isMobile && setMobileDrawerOpen(false)}
+                  sx={isActive ? { backgroundColor: '#e3ecf7', fontWeight: 600 } : {}}
+                >
                   <ListItemIcon sx={{ color: isActive ? '#1976d2' : 'inherit' }}>{item.icon}</ListItemIcon>
                   <ListItemText primary={item.text} />
                 </ListItemButton>
@@ -403,12 +511,31 @@ const AppLayout: React.FC<AppLayoutProps> = ({
       </Drawer>
       
       {/* Main Content */}
-      <Box component="main" sx={{ flexGrow: 1, p: 3, marginTop: '64px', width: `calc(100% - ${drawerWidth}px)`, transition: (theme) => theme.transitions.create('width', { easing: theme.transitions.easing.sharp, duration: theme.transitions.duration.enteringScreen }) }}>
+      <Box 
+        component="main" 
+        sx={{ 
+          flexGrow: 1, 
+          p: { xs: 1, sm: 2, md: 3 }, 
+          marginTop: '64px', 
+          width: { xs: '100%', md: `calc(100% - ${drawerWidth}px)` },
+          transition: (theme) => theme.transitions.create('width', { easing: theme.transitions.easing.sharp, duration: theme.transitions.duration.enteringScreen }),
+          pb: { xs: 8, md: 3 } // Add bottom padding for mobile footer
+        }}
+      >
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
         
         {!dbBuffer && !loading && !isSnapshotMode && (
-          <Box sx={{ textAlign: 'center', mt: 10 }}>
-             <Button variant="contained" onClick={() => document.getElementById('db-upload')?.click()} sx={{ height: '50px', width: '300px', fontSize: '1.1rem' }}>
+          <Box sx={{ textAlign: 'center', mt: { xs: 5, md: 10 } }}>
+             <Button 
+               variant="contained" 
+               onClick={() => document.getElementById('db-upload')?.click()} 
+               sx={{ 
+                 height: { xs: '45px', md: '50px' }, 
+                 width: { xs: '90%', sm: '300px' }, 
+                 fontSize: { xs: '1rem', md: '1.1rem' },
+                 maxWidth: '300px'
+               }}
+             >
                 Upload Your Signal Data
              </Button>
              <input type="file" id="db-upload" accept=".db,.sqlite,.sqlite3" style={{ display: 'none' }} onChange={onFileChange} />
@@ -418,13 +545,34 @@ const AppLayout: React.FC<AppLayoutProps> = ({
         {children || <Outlet />}
         
         {/* Footer */}
-        <Box sx={{ borderTop: 1, borderColor: 'divider', backgroundColor: '#f0f4ff', position: 'fixed', bottom: 0, left: drawerWidth, right: 0, height: '20px', zIndex: (theme) => theme.zIndex.drawer - 1, display: 'flex', justifyContent: 'center', alignItems: 'center', padding: '12px 0' }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-            <a href="https://github.com/ahstewart/signal-snapshot" target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', display: 'flex', alignItems: 'center' }}>
-              <GitHubIcon fontSize="small" sx={{ mr: .5 }} /> GitHub
+        <Box 
+          sx={{ 
+            borderTop: 1, 
+            borderColor: 'divider', 
+            backgroundColor: '#f0f4ff', 
+            position: { xs: 'fixed', md: 'fixed' },
+            bottom: 0, 
+            left: { xs: 0, md: drawerWidth }, 
+            right: 0, 
+            minHeight: '44px',
+            zIndex: (theme) => theme.zIndex.drawer - 1, 
+            display: 'flex', 
+            justifyContent: 'center', 
+            alignItems: 'center', 
+            padding: { xs: '8px 4px', md: '12px 0' },
+            flexWrap: 'wrap',
+            gap: { xs: 0.5, md: 2 }
+          }}
+        >
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 0.5, md: 2 }, flexWrap: 'wrap', justifyContent: 'center', fontSize: { xs: '0.75rem', md: '0.875rem' } }}>
+            <a href="https://github.com/ahstewart/signal-snapshot" target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
+              <GitHubIcon fontSize="small" sx={{ mr: 0.5, fontSize: { xs: '0.875rem', md: '1rem' } }} /> 
+              <span style={{ fontSize: 'inherit' }}>GitHub</span>
             </a>
-            ·
-            <a href="mailto:hank@signalsnapshot.com" style={{ color: 'inherit', marginLeft: '5px' }}>hank@signalsnapshot.com</a>
+            {useMediaQuery(theme.breakpoints.up('sm')) && <span>·</span>}
+            <a href="mailto:hank@signalsnapshot.com" style={{ color: 'inherit', textDecoration: 'none', fontSize: 'inherit' }}>
+              hank@signalsnapshot.com
+            </a>
           </Box>
         </Box>
       </Box>

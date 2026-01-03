@@ -14,6 +14,9 @@ import {
   Typography,
   Chip,
   Tooltip as MuiTooltip,
+  Divider,
+  useTheme,
+  useMediaQuery,
 } from '@mui/material';
 import {
   ResponsiveContainer,
@@ -28,7 +31,35 @@ import { Autocomplete, TextField } from '@mui/material';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
 
 import { AnalyticsData, Conversation, User, EmotionUserData } from '../utils/database';
-import { PageHeader } from './PageHeader';
+
+// --- Internal Components ---
+
+interface PageHeaderProps {
+  title: string;
+  subtitle: string;
+  children?: React.ReactNode;
+}
+
+const PageHeader: React.FC<PageHeaderProps> = ({ title, subtitle, children }) => (
+  <Box sx={{ mb: 4 }}>
+    <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', md: 'flex-start' }, gap: 2 }}>
+      <Box>
+        <Typography variant="h4" component="h1" fontWeight="700" color="text.primary" gutterBottom>
+          {title}
+        </Typography>
+        <Typography variant="body1" color="text.secondary">
+          {subtitle}
+        </Typography>
+      </Box>
+      <Box sx={{ width: { xs: '100%', md: 'auto' }, minWidth: 300 }}>
+        {children}
+      </Box>
+    </Box>
+    <Divider sx={{ mt: 3 }} />
+  </Box>
+);
+
+// --- Dashboard Component ---
 
 interface DashboardProps {
   data: AnalyticsData | null;
@@ -49,6 +80,13 @@ const Dashboard: React.FC<DashboardProps> = ({
   onConversationSelect,
   users,
 }: DashboardProps) => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const tickFontSize = isMobile ? 10 : 12;
+  const chartMargin = isMobile 
+    ? { top: 5, right: 5, bottom: 20, left: -20 }
+    : { top: 5, right: 20, bottom: 0, left: 0 };
+
   const handleConversationChange = (event: any, value: string | null) => {
     onConversationSelect(value ? [value] : []);
   };
@@ -181,17 +219,23 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   function renderDailyChart() {
     return (
-      <Paper sx={{ p: { xs: 2, sm: 5 }, height: { xs: 300, md: 400 }, display: 'flex', flexDirection: 'column' }}>
-        <Typography variant="h6" gutterBottom>Daily Message Activity</Typography>
-        <Box sx={{ flexGrow: 1, minHeight: 0 }}>
+      <Paper sx={{ p: { xs: 2, sm: 5 }, height: { xs: 300, md: 400 }, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <Typography variant="h6" gutterBottom sx={{ fontSize: { xs: '1rem', md: '1.25rem' } }}>Daily Message Activity</Typography>
+        <Box sx={{ flexGrow: 1, minHeight: 0, width: '100%' }}>
         {analyticsData?.message_counts?.by_day ? (
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={Object.entries(analyticsData.message_counts.by_day)}>
+            <LineChart data={Object.entries(analyticsData.message_counts.by_day)} margin={chartMargin}>
               <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="0" />
-              <YAxis width={40} />
+              <XAxis 
+                dataKey="0" 
+                angle={-45}
+                textAnchor="end"
+                height={60}
+                tick={{ fontSize: tickFontSize }}
+              />
+              <YAxis width={40} tick={{ fontSize: tickFontSize }} />
               <Tooltip />
-              <Line type="monotone" dataKey="1" stroke="#8884d8" dot={false} />
+              <Line type="monotone" dataKey="1" stroke="#8884d8" dot={false} strokeWidth={2} />
             </LineChart>
           </ResponsiveContainer>
         ) : <Typography variant="body2" color="text.secondary">No data</Typography>}
@@ -216,22 +260,23 @@ const Dashboard: React.FC<DashboardProps> = ({
     }
 
     return (
-      <Paper sx={{ p: { xs: 2, sm: 5 }, height: { xs: 300, md: 400 }, display: 'flex', flexDirection: 'column' }}>
-        <Typography variant="h6" gutterBottom>Hourly Activity (Pacific Time)</Typography>
-        <Box sx={{ flexGrow: 1, minHeight: 0 }}>
+      <Paper sx={{ p: { xs: 2, sm: 5 }, height: { xs: 300, md: 400 }, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+        <Typography variant="h6" gutterBottom sx={{ fontSize: { xs: '1rem', md: '1.25rem' } }}>Hourly Activity (Pacific Time)</Typography>
+        <Box sx={{ flexGrow: 1, minHeight: 0, width: '100%' }}>
         {pacificData.length > 0 ? (
           <ResponsiveContainer width="100%" height="100%">
-            <LineChart data={pacificData}>
+            <LineChart data={pacificData} margin={chartMargin}>
               <XAxis 
                 dataKey="hour" 
                 tickFormatter={(v) => formatHour(parseInt(v as string, 10))} 
                 type="number"
                 domain={[0, 23]}
                 tickCount={12}
+                tick={{ fontSize: tickFontSize }}
               />
-              <YAxis width={40} />
+              <YAxis width={40} tick={{ fontSize: tickFontSize }} />
               <Tooltip labelFormatter={(v) => `${formatHour(v)} PT`} />
-              <Line type="monotone" dataKey="count" stroke="#8884d8" />
+              <Line type="monotone" dataKey="count" stroke="#8884d8" strokeWidth={2} />
             </LineChart>
           </ResponsiveContainer>
         ) : <Typography variant="body2" color="text.secondary">No data</Typography>}
@@ -251,21 +296,21 @@ const Dashboard: React.FC<DashboardProps> = ({
         </Grid>
         <Grid item xs={12} md={8}>
           <Paper sx={{ p: 2, overflowX: 'auto' }}>
-            <Typography variant="h6" gutterBottom>Top 10 Emojis</Typography>
+            <Typography variant="h6" gutterBottom sx={{ fontSize: { xs: '1rem', md: '1.25rem' } }}>Top 10 Emojis</Typography>
             {analyticsData?.reactions?.top_emojis && analyticsData.reactions.top_emojis.length > 0 ? (
               <TableContainer>
-                <Table size="small">
+                <Table size="small" sx={{ minWidth: { xs: 200, md: 300 } }}>
                   <TableHead>
                     <TableRow>
-                      <TableCell sx={{ fontWeight: 'bold' }}>Emoji</TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 'bold' }}>Count</TableCell>
+                      <TableCell sx={{ fontWeight: 'bold', fontSize: { xs: '0.75rem', md: '0.875rem' } }}>Emoji</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: { xs: '0.75rem', md: '0.875rem' } }}>Count</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
                     {analyticsData.reactions.top_emojis.map((reaction: { emoji: string; count: number }) => (
                       <TableRow key={reaction.emoji}>
-                        <TableCell component="th" scope="row" sx={{ fontSize: '1.2rem' }}>{reaction.emoji}</TableCell>
-                        <TableCell align="right">{reaction.count}</TableCell>
+                        <TableCell component="th" scope="row" sx={{ fontSize: { xs: '1rem', md: '1.2rem' } }}>{reaction.emoji}</TableCell>
+                        <TableCell align="right" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>{reaction.count}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -423,23 +468,23 @@ const Dashboard: React.FC<DashboardProps> = ({
       <Box sx={{ mt: 4 }}>
         <Typography variant="h5" gutterBottom sx={{ fontSize: { xs: '1.25rem', md: '1.5rem' } }}>{title}</Typography>
         <Paper sx={{ p: 0, overflow: 'hidden' }}>
-          <TableContainer>
-            <Table stickyHeader size="small">
+          <TableContainer sx={{ maxHeight: { xs: 400, md: 'none' }, overflowX: 'auto' }}>
+            <Table stickyHeader size="small" sx={{ minWidth: { xs: 400, md: 650 } }}>
               <TableHead>
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 'bold' }}>User</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 'bold' }}>{totalReactsLabel}</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 'bold' }}>Rate</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 'bold' }}>{scoreLabel}</TableCell>
+                  <TableCell sx={{ fontWeight: 'bold', fontSize: { xs: '0.75rem', md: '0.875rem' }, whiteSpace: 'nowrap' }}>User</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: { xs: '0.75rem', md: '0.875rem' }, whiteSpace: 'nowrap' }}>{totalReactsLabel}</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: { xs: '0.75rem', md: '0.875rem' }, whiteSpace: 'nowrap' }}>Rate</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: { xs: '0.75rem', md: '0.875rem' }, whiteSpace: 'nowrap' }}>{scoreLabel}</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {data.slice(0, 10).map((user: EmotionUserData) => (
                   <TableRow key={user.name}>
-                    <TableCell component="th" scope="row">{user.name}</TableCell>
-                    <TableCell align="right">{user.totalReacts}</TableCell>
-                    <TableCell align="right">{user.rate.toFixed(3)}</TableCell>
-                    <TableCell align="right">{user.score.toFixed(3)}</TableCell>
+                    <TableCell component="th" scope="row" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>{user.name}</TableCell>
+                    <TableCell align="right" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>{user.totalReacts}</TableCell>
+                    <TableCell align="right" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>{user.rate.toFixed(3)}</TableCell>
+                    <TableCell align="right" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>{user.score.toFixed(3)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -451,13 +496,13 @@ const Dashboard: React.FC<DashboardProps> = ({
   }
 
   return (
-    <Box sx={{ p: { xs: 1, md: 2 }, overflowX: 'hidden' }}>
+    <Box sx={{ p: { xs: 1, md: 2 }, overflowX: 'hidden', width: '100%' }}>
       <PageHeader 
         title="Group Chat Analytics"
         subtitle="Select a group chat to analyze."
       >
         {analyticsData?.all_conversations && (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%', mt: 2 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%', mt: { xs: 1, md: 2 } }}>
             <Autocomplete
               fullWidth
               options={analyticsData.all_conversations.map((convo: Conversation) => convo.id)}
@@ -472,7 +517,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                   {...params} 
                   label="Select Group Chat" 
                   variant="outlined" 
-                  size="small" 
+                  size="small"
+                  sx={{ fontSize: { xs: '0.875rem', md: '1rem' } }}
                 />
               )}
               isOptionEqualToValue={(option, value) => option === value}
