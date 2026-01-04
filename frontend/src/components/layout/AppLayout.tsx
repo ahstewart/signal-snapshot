@@ -405,8 +405,8 @@ const AppLayout: React.FC<AppLayoutProps> = ({
           <Box sx={{ maxWidth: 1200, mx: 'auto', py: 2, px: 1, textAlign: 'center', display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 3, alignItems: 'stretch', justifyContent: 'center' }}>
             {[
               { title: "What is it?", content: "A web tool that generates custom data visualizations from your Signal conversations." },
-              { title: "How does it work?", content: "You upload your Signal data file directly to the app. The app processes it in your browser." },
-              { title: "Is it secure?", content: `<strong>Absolutely.</strong> This app runs entirely in your browser—your data never leaves your device.` }
+              { title: "How does it work?", content: `You upload your Signal data file directly to the app. The app processes it in your browser. Signal's core tenet is privacy, you'll first have to decrypt your Signal database before uploading it. A tool to facilitate this can be found <a href="https://github.com/ahstewart/signal-decrypt" target="_blank" rel="noopener noreferrer">here</a>.` },
+              { title: "Is it secure?", content: `<strong>Absolutely.</strong> This app runs entirely in your browser—your data never leaves your device. Want to make sure? Press F12 while using the app and monitor the network tab. You'll notice that no requests are being made. This app's code is also open source, feel free to <a href="https://github.com/ahstewart/signal-snapshot" target="_blank" rel="noopener noreferrer">check it out on GitHub</a>.` }
             ].map((section, idx) => (
               <Box key={section.title} sx={{ flex: 1, minWidth: 0, bgcolor: '#fafdff', borderRadius: 4, boxShadow: 2, p: 3, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                 <Typography variant="h6" sx={{ color: '#0057b8', fontWeight: 600, mt: 1, mb: 1 }}>{section.title}</Typography>
