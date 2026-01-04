@@ -140,10 +140,9 @@ const IndividualStats: React.FC<IndividualStatsProps> = ({
             >
                 <Box sx={{ mb: 2 }}>
                     <Typography variant="h6" color="primary.main" sx={{ fontWeight: 700 }}>
-                        User Profile
+                        Personality Analysis Presented by Toyotathon
                     </Typography>
                 </Box>
-                
                 <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap', lineHeight: 1.6, color: 'text.primary', fontSize: { xs: '0.9rem', md: '1rem' } }}>
                     {(data as any).summary}
                 </Typography>

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Box, Typography, Paper, CircularProgress, Alert, Grid, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Button, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@mui/material';
 import HelpOutlineIcon from '@mui/icons-material/HelpOutline';
 import { AnalyticsData, User, UserActivity } from '../utils/database';
@@ -13,6 +14,8 @@ interface SummaryPageProps {
 }
 
 const SummaryPage: React.FC<SummaryPageProps> = ({ data, loading, error, users }) => {
+    const location = useLocation();
+    const isSnapshotMode = location.pathname.startsWith('/snapshot');
     const [helpOpen, setHelpOpen] = useState(false);
 
     const handleHelpOpen = () => {
@@ -69,7 +72,7 @@ const SummaryPage: React.FC<SummaryPageProps> = ({ data, loading, error, users }
         <Box sx={{ p: { xs: 1, md: 3 } }}>
             {data && (
                 <PageHeader 
-                    title="Signal Snapshot Dashboard"
+                    title={isSnapshotMode ? "Signal Snapshot - Units 2025" : "Signal Snapshot Dashboard"}
                     subtitle="Welcome to your Signal Snapshot! Explore different layers of your Signal ecosystem."
                 />
             )}

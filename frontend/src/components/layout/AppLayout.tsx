@@ -28,7 +28,8 @@ import {
   Tooltip,
   useTheme,
   useMediaQuery,
-  Menu
+  Menu,
+  Divider
 } from '@mui/material';
 import { AnalyticsData, loadDatabase, loadIndividualStats, loadUsers } from '../../utils/database';
 import { createDashboardHtml } from '../../utils/export';
@@ -73,7 +74,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [welcomeOpen, setWelcomeOpen] = useState(showWelcome);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
-  const [mobileMenuAnchor, setMobileMenuAnchor] = useState<null | HTMLElement>(null);
   
   // Export dialog state
   const [exportOpen, setExportOpen] = useState(false);
@@ -94,14 +94,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({
     onCloseWelcome();
   };
 
-  const handleMobileMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
-    setMobileMenuAnchor(event.currentTarget);
-  };
-
-  const handleMobileMenuClose = () => {
-    setMobileMenuAnchor(null);
-  };
-
   const handleDrawerToggle = () => {
     setMobileDrawerOpen(!mobileDrawerOpen);
   };
@@ -109,7 +101,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({
   const isSnapshotMode = basePath !== '/app';
 
   const menuItems = [
-    { text: 'Summary', icon: <SummarizeIcon />, path: `${basePath}/summary` },
+    ...(isSnapshotMode ? [] : [{ text: 'Summary', icon: <SummarizeIcon />, path: `${basePath}/summary` }]),
     { text: 'Group Chats', icon: <DashboardIcon />, path: `${basePath}/groupchats` },
     // Include Individual stats in both modes
     { text: 'Individual Stats', icon: <PersonIcon />, path: `${basePath}/individual` }
@@ -154,39 +146,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({
           <Box sx={{ flexGrow: 1 }} />
           
           {isMobile ? (
-            <>
-              <IconButton color="inherit" onClick={handleMobileMenuOpen} aria-label="Menu">
-                <MenuIcon />
-              </IconButton>
-              <Menu
-                anchorEl={mobileMenuAnchor}
-                open={Boolean(mobileMenuAnchor)}
-                onClose={handleMobileMenuClose}
-                anchorOrigin={{
-                  vertical: 'bottom',
-                  horizontal: 'right',
-                }}
-                transformOrigin={{
-                  vertical: 'top',
-                  horizontal: 'right',
-                }}
-              >
-                <MenuItem onClick={() => { handleWelcomeOpen(); handleMobileMenuClose(); }}>
-                  <HelpOutlineIcon sx={{ mr: 1 }} />
-                  About
-                </MenuItem>
-                {dbBuffer && !isSnapshotMode && (
-                  <>
-                    <MenuItem onClick={() => { document.getElementById('change-db-input')?.click(); handleMobileMenuClose(); }}>
-                      Change Data Source
-                    </MenuItem>
-                    <MenuItem onClick={() => { setExportOpen(true); handleMobileMenuClose(); }}>
-                      Export
-                    </MenuItem>
-                  </>
-                )}
-              </Menu>
-            </>
+            <IconButton color="inherit" onClick={handleWelcomeOpen} aria-label="About Signal Snapshot">
+              <HelpOutlineIcon />
+            </IconButton>
           ) : (
             <>
               <IconButton color="inherit" onClick={handleWelcomeOpen} aria-label="About Signal Snapshot" sx={{ mr: 1 }}>
@@ -507,6 +469,37 @@ const AppLayout: React.FC<AppLayoutProps> = ({
               </ListItem>
              );
           })}
+          {isMobile && dbBuffer && !isSnapshotMode && (
+            <>
+              <Divider sx={{ my: 1 }} />
+              <ListItem disablePadding>
+                <ListItemButton 
+                  onClick={() => {
+                    document.getElementById('change-db-input')?.click();
+                    setMobileDrawerOpen(false);
+                  }}
+                >
+                  <ListItemIcon>
+                    <DashboardIcon />
+                  </ListItemIcon>
+                  <ListItemText primary="Change Data Source" />
+                </ListItemButton>
+              </ListItem>
+              <ListItem disablePadding>
+                <ListItemButton 
+                  onClick={() => {
+                    setExportOpen(true);
+                    setMobileDrawerOpen(false);
+                  }}
+                >
+                  <ListItemIcon>
+                    <SummarizeIcon />
+                  </ListItemIcon>
+                  <ListItemText primary="Export" />
+                </ListItemButton>
+              </ListItem>
+            </>
+          )}
         </List>
       </Drawer>
       
@@ -579,5 +572,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({
     </Box>
   );
 };
+
 
 export default AppLayout;

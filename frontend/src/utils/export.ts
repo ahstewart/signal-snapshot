@@ -232,8 +232,8 @@ export function createDashboardHtml(analyticsData: AnalyticsData): string {
 
             const renderAwards = () => {
                 if (!analyticsData.awards) return null;
-                const awardDisplayTitles = { most_messages_sent: "Most Messages Sent", most_reactions_given: "Most Reactions Given", most_reactions_received: "Most Reactions Received", most_mentioned: "Most Mentioned", most_mentions_made: "Most Mentions Made", most_media_sent: "Most Media Sent", most_night_owl: "Night Owl", most_early_bird: "Early Bird", longest_avg_message: "The Rambler", hottest_newbie: "Hottest Newbie", lurker: "The Lurker", most_unique_emojis: "The Emoji Artist" };
-                const awardSuffixes = { most_messages_sent: "messages", most_reactions_given: "reactions", most_reactions_received: "received", most_mentioned: "mentions", most_mentions_made: "mentions", most_media_sent: "files", most_night_owl: "%", most_early_bird: "%", longest_avg_message: "chars/msg", hottest_newbie: "messages", lurker: "reacts/msg", most_unique_emojis: "unique emojis" };
+                const awardDisplayTitles = { most_messages_sent: "Most Messages Sent", most_reactions_given: "Most Reactions Given", most_reactions_received: "Most Reactions Received", most_mentioned: "Most Mentioned", most_mentions_made: "Most Mentions Made", most_media_sent: "Most Media Sent", most_night_owl: "Night Owl", most_early_bird: "Early Bird", longest_avg_message: "The Rambler", hottest_newbie: "Newb of the Year", lurker: "The Lurker", most_unique_emojis: "The Fuzz" };
+                const awardSuffixes = { most_messages_sent: "messages", most_reactions_given: "reactions", most_reactions_received: "received", most_mentioned: "mentions", most_mentions_made: "mentions", most_media_sent: "images, videos, and GIFs sent", most_night_owl: "%", most_early_bird: "%", longest_avg_message: "chars/msg", hottest_newbie: "messages", lurker: "reacts/msg", most_unique_emojis: "folder emojis sent" };
                 return (
                     <Box sx={{ mt: 4 }}>
                          <Typography variant="h4" sx={{ fontWeight: 'bold', borderLeft: '6px solid #1976d2', pl: 2, mb: 2, color: '#222', background: 'linear-gradient(90deg, #f4f7fa 0%, #e3ecf7 100%)', borderRadius: 2, boxShadow: 1 }}>Awards</Typography>
@@ -261,7 +261,7 @@ export function createDashboardHtml(analyticsData: AnalyticsData): string {
                                         </TableRow>
                                     </TableHead>
                                     <TableBody>
-                                        {rankingData.slice(0, 10).map((user) => (
+                                        {rankingData.slice(0, 50).map((user) => (
                                             <TableRow key={user.name}>
                                                 <TableCell component="th" scope="row" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>{user.name}</TableCell>
                                                 <TableCell align="right" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>{user.totalReacts}</TableCell>

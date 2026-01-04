@@ -522,7 +522,7 @@ export async function processDatabase(
             
             // Hottest Newbie: Joined in 2025 (first message >= Jan 1 2025)
             hottest_newbie: `
-                SELECT sourceServiceId, COUNT(*) as count
+                SELECT sourceServiceId, COUNT(*) / (MIN(sent_at) - 1767254400) as count_since_join
                 FROM messages
                 ${msgWhere ? msgWhere + ' AND ' : 'WHERE '} sourceServiceId IN (
                     SELECT sourceServiceId
@@ -531,19 +531,20 @@ export async function processDatabase(
                     HAVING MIN(sent_at) >= 1735689600000
                 )
                 GROUP BY sourceServiceId
-                ORDER BY count DESC
+                ORDER BY count_since_join DESC
                 LIMIT 1
             `,
             
             // Lurker: Highest Ratio of Reactions Given to Messages Sent (min 5 reactions)
+            // Formula emphasizes low message counts by squaring the denominator
             lurker: `
                 SELECT
                     r.fromId,
-                    CAST(r.react_count AS FLOAT) / (IFNULL(m.msg_count, 0) + 1) as ratio
+                    CAST(r.react_count AS FLOAT) / POWER(IFNULL(m.msg_count, 0) + 1, 3) as ratio
                 FROM (
                     SELECT fromId, COUNT(*) as react_count 
                     FROM reactions 
-                    ${reactWhere} 
+                    ${reactWhere}
                     GROUP BY fromId
                 ) r
                 LEFT JOIN (
@@ -560,9 +561,9 @@ export async function processDatabase(
             
             // Most Unique Emojis Used
             most_unique_emojis: `
-                SELECT fromId, COUNT(DISTINCT emoji) as count 
-                FROM reactions 
-                ${reactWhere} 
+                SELECT fromId, COUNT(emoji) as count 
+                FROM reactions
+                ${reactWhere} AND emoji = '📁'
                 GROUP BY fromId 
                 ORDER BY count DESC 
                 LIMIT 1

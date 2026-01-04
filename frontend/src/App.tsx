@@ -255,12 +255,11 @@ function App() {
             />
           }
         >
-          <Route index element={<Navigate to="summary" replace />} />
-          <Route path="summary" element={<SummaryPage data={originalAnalyticsData} loading={loading} error={error} users={users} />} />
+          <Route index element={<Navigate to="groupchats" replace />} />
           <Route path="groupchats" element={<Dashboard data={analyticsData} loading={loading} error={error} selectedConversationIds={selectedConversationIds} onConversationSelect={setSelectedConversationIds} users={users} selectedUser={selectedUser} onUserSelect={setSelectedUser} />} />
           {/* New Route for Individual Stats in Snapshot Mode */}
           <Route path="individual" element={<IndividualStats data={statsData} loading={loading} error={error} users={users} selectedUser={selectedUser} onUserSelect={setSelectedUser} />} />
-          <Route path="*" element={<Navigate to="summary" replace />} />
+          <Route path="*" element={<Navigate to="groupchats" replace />} />
         </Route>
 
         {/* NORMAL APP ROUTES */}

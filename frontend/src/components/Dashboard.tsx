@@ -1,4 +1,5 @@
 import React from 'react';
+import { useLocation } from 'react-router-dom';
 import {
   Alert,
   Box,
@@ -80,6 +81,8 @@ const Dashboard: React.FC<DashboardProps> = ({
   onConversationSelect,
   users,
 }: DashboardProps) => {
+  const location = useLocation();
+  const isSnapshotMode = location.pathname.startsWith('/snapshot');
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const tickFontSize = isMobile ? 10 : 12;
@@ -261,7 +264,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
     return (
       <Paper sx={{ p: { xs: 2, sm: 5 }, height: { xs: 300, md: 400 }, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <Typography variant="h6" gutterBottom sx={{ fontSize: { xs: '1rem', md: '1.25rem' } }}>Hourly Activity (Pacific Time)</Typography>
+        <Typography variant="h6" gutterBottom sx={{ fontSize: { xs: '1rem', md: '1.25rem' } }}>Average Hourly Activity (Pacific Time)</Typography>
         <Box sx={{ flexGrow: 1, minHeight: 0, width: '100%' }}>
         {pacificData.length > 0 ? (
           <ResponsiveContainer width="100%" height="100%">
@@ -327,25 +330,42 @@ const Dashboard: React.FC<DashboardProps> = ({
     return (
       <Grid item xs={12} sm={6} md={4} key={title}>
         <Paper sx={{ p: 2, height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center' }}>
-          <MuiTooltip title={tooltip} arrow placement="top">
-            <Typography 
-                variant="h6" 
-                component="div" 
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 1 }}>
+            <MuiTooltip title={tooltip} arrow placement="top" disableHoverListener={isMobile}>
+              <Typography 
+                  variant="h6" 
+                  component="div" 
+                  sx={{ 
+                      textAlign: 'center', 
+                      fontSize: '1.0rem',
+                      textDecoration: 'underline dotted',
+                      textDecorationColor: 'text.secondary',
+                      cursor: isMobile ? 'default' : 'help',
+                      width: 'fit-content',
+                      fontWeight: 800,
+                      color: 'text.secondary'
+                  }}
+              >
+                  {title}
+              </Typography>
+            </MuiTooltip>
+            {isMobile && tooltip && (
+              <Typography 
+                variant="caption" 
                 sx={{ 
-                    textAlign: 'center', 
-                    fontSize: '1.0rem',
-                    textDecoration: 'underline dotted',
-                    textDecorationColor: 'text.secondary',
-                    cursor: 'help',
-                    width: 'fit-content',
-                    mb: 1,
-                    fontWeight: 800,
-                    color: 'text.secondary'
+                  textAlign: 'center', 
+                  color: 'text.secondary',
+                  fontSize: '0.7rem',
+                  mt: 0.5,
+                  px: 1,
+                  maxWidth: '100%',
+                  lineHeight: 1.2
                 }}
-            >
-                {title}
-            </Typography>
-          </MuiTooltip>
+              >
+                {tooltip}
+              </Typography>
+            )}
+          </Box>
           {award.winner ? (
             <>
               <Typography 
@@ -387,12 +407,12 @@ const Dashboard: React.FC<DashboardProps> = ({
       most_mentioned: "Most Mentioned",
       most_mentions_made: "Most Mentions Made",
       most_media_sent: "Most Media Sent",
-      most_night_owl: "Night Owl",
-      most_early_bird: "Early Bird",
+      most_night_owl: "Night Bird",
+      most_early_bird: "Early Owl",
       longest_avg_message: "The Rambler",
-      hottest_newbie: "Hottest Newbie",
+      hottest_newbie: "Newb of the Year",
       lurker: "The Lurker",
-      most_unique_emojis: "The Emoji Artist",
+      most_unique_emojis: "The Fuzz",
     };
 
     const awardSuffixes: Record<keyof typeof analyticsData.awards, string> = {
@@ -401,13 +421,13 @@ const Dashboard: React.FC<DashboardProps> = ({
         most_reactions_received: "received",
         most_mentioned: "mentions",
         most_mentions_made: "mentions",
-        most_media_sent: "files",
+        most_media_sent: "images, videos, and GIFs sent",
         most_night_owl: "%", 
         most_early_bird: "%", 
         longest_avg_message: "chars/msg",
         hottest_newbie: "messages",
         lurker: "reacts/msg",
-        most_unique_emojis: "unique emojis"
+        most_unique_emojis: "folder emojis sent"
     };
 
     const awardTooltips: Record<keyof typeof analyticsData.awards, string> = {
@@ -419,10 +439,10 @@ const Dashboard: React.FC<DashboardProps> = ({
       most_media_sent: "Total count of images, videos, or files sent.",
       most_night_owl: "Percentage of their messages sent between 12 AM and 5 AM (Pacific).",
       most_early_bird: "Percentage of their messages sent between 5 AM and 9 AM (Pacific).",
-      longest_avg_message: "Highest average character count per message (min 10 messages).",
-      hottest_newbie: "Most messages sent by a user who joined in 2025.",
-      lurker: "Highest ratio of reactions given to messages sent (min 5 reactions).",
-      most_unique_emojis: "Highest number of unique emoji types used in reactions."
+      longest_avg_message: "Highest average character count per message.",
+      hottest_newbie: "Highest message rate by a user who joined in 2025.",
+      lurker: "Highest ratio of reactions given to messages sent.",
+      most_unique_emojis: "Highest number of folder emojis used in reactions."
     };
 
     return (
@@ -454,8 +474,9 @@ const Dashboard: React.FC<DashboardProps> = ({
     );
   }
 
-  function EmotionRankings({ title, data, scoreLabel, totalReactsLabel }: {
+  function EmotionRankings({ title, subtitle, data, scoreLabel, totalReactsLabel }: {
     title: string;
+    subtitle?: string;
     data: EmotionUserData[];
     scoreLabel: string;
     totalReactsLabel: string;
@@ -467,6 +488,7 @@ const Dashboard: React.FC<DashboardProps> = ({
     return (
       <Box sx={{ mt: 4 }}>
         <Typography variant="h5" gutterBottom sx={{ fontSize: { xs: '1.25rem', md: '1.5rem' } }}>{title}</Typography>
+        <Typography variant="subtitle2" color="text.secondary">{subtitle}</Typography>
         <Paper sx={{ p: 0, overflow: 'hidden' }}>
           <TableContainer sx={{ maxHeight: { xs: 400, md: 'none' }, overflowX: 'auto' }}>
             <Table stickyHeader size="small" sx={{ minWidth: { xs: 400, md: 650 } }}>
@@ -479,7 +501,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                 </TableRow>
               </TableHead>
               <TableBody>
-                {data.slice(0, 10).map((user: EmotionUserData) => (
+                {data.slice(0, 50).map((user: EmotionUserData) => (
                   <TableRow key={user.name}>
                     <TableCell component="th" scope="row" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>{user.name}</TableCell>
                     <TableCell align="right" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>{user.totalReacts}</TableCell>
@@ -498,10 +520,10 @@ const Dashboard: React.FC<DashboardProps> = ({
   return (
     <Box sx={{ p: { xs: 1, md: 2 }, overflowX: 'hidden', width: '100%' }}>
       <PageHeader 
-        title="Group Chat Analytics"
-        subtitle="Select a group chat to analyze."
+        title={isSnapshotMode ? "🍆 Absolute Units 🍆 Year in Review" : "Group Chat Analytics"}
+        subtitle={isSnapshotMode ? "" : "Select a group chat to analyze."}
       >
-        {analyticsData?.all_conversations && (
+        {!isSnapshotMode && analyticsData?.all_conversations && (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, width: '100%', mt: { xs: 1, md: 2 } }}>
             <Autocomplete
               fullWidth
@@ -546,11 +568,13 @@ const Dashboard: React.FC<DashboardProps> = ({
           {renderAwards()}
         </Grid>
 
+
         {analyticsData && (
             <>
                 <Grid item xs={12} md={6} lg={4}>
                 <EmotionRankings
                     title="😂 Who is the Funniest? 😂"
+                    subtitle="Laugh reactions received. Only counts messages with at least 1 laugh."
                     data={analyticsData.funniestUsers}
                     scoreLabel="Humor Score"
                     totalReactsLabel="Total Laugh Reacts"
@@ -559,6 +583,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                 <Grid item xs={12} md={6} lg={4}>
                 <EmotionRankings
                     title="❤️ Who is the Most Loved? ❤️"
+                    subtitle="Hearts received."
                     data={analyticsData.mostLovedUsers}
                     scoreLabel="Love Score"
                     totalReactsLabel="Total Love Reacts"
@@ -567,6 +592,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                 <Grid item xs={12} md={6} lg={4}>
                 <EmotionRankings
                     title="😮 Who is the Most Shocking? 😮"
+                    subtitle="Shock reactions received."
                     data={analyticsData.mostShockingUsers}
                     scoreLabel="Shock Score"
                     totalReactsLabel="Total Shock Reacts"
@@ -575,6 +601,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                 <Grid item xs={12} md={6} lg={4}>
                 <EmotionRankings
                     title="👎 Who is the Most Disliked? 👎"
+                    subtitle="Downvotes received."
                     data={analyticsData.mostDislikedUsers}
                     scoreLabel="Dislike Score"
                     totalReactsLabel="Total Dislikes"
@@ -583,6 +610,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                 <Grid item xs={12} md={6} lg={4}>
                 <EmotionRankings
                     title="🍆 Who is the Most Randy? 🍆"
+                    subtitle="Eggplants given."
                     data={analyticsData.mostRandyUsers}
                     scoreLabel="Randy Score"
                     totalReactsLabel="Total Eggplants"
@@ -590,7 +618,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                 </Grid>
                 <Grid item xs={12} md={6} lg={4}>
                 <EmotionRankings
-                    title="🍆 Who is the Most Thirsty? 🍆"
+                    title="😩 Who is the Most Doable? 😩"
+                    subtitle="Eggplants recieved."
                     data={analyticsData.mostThirstyUsers}
                     scoreLabel="Thirst Score"
                     totalReactsLabel="Total Eggplants"
