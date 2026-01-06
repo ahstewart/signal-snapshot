@@ -50,6 +50,8 @@ function App() {
       setLoading(true);
       try {
         console.log("Loading Static Snapshot...");
+        console.log("[Snapshot Init] STATIC_SNAPSHOT.users:", STATIC_SNAPSHOT.users?.length, STATIC_SNAPSHOT.users?.slice(0, 2));
+        console.log("[Snapshot Init] STATIC_SNAPSHOT.individualStats keys:", Object.keys(STATIC_SNAPSHOT.individualStats || {}).slice(0, 5));
         setAnalyticsData(STATIC_SNAPSHOT.analytics);
         setOriginalAnalyticsData(STATIC_SNAPSHOT.analytics);
         setUsers(STATIC_SNAPSHOT.users);
@@ -182,12 +184,53 @@ function App() {
 
     // --- SNAPSHOT MODE LOGIC ---
     if (isSnapshotMode) {
-      if (staticIndividualStats && staticIndividualStats[selectedUser]) {
-        setStatsData(staticIndividualStats[selectedUser]);
+      // Wait for snapshot data to be loaded
+      if (!staticIndividualStats) {
+        return;
+      }
+
+      const statsKeys = Object.keys(staticIndividualStats);
+      console.log('[Snapshot] selectedUser:', selectedUser);
+      console.log('[Snapshot] statsKeys sample:', statsKeys.slice(0, 3));
+      console.log('[Snapshot] users sample:', users.slice(0, 3).map(u => ({ id: u.id, name: u.name })));
+      
+      // Direct lookup by selectedUser
+      const direct = staticIndividualStats[selectedUser];
+      console.log('[Snapshot] direct lookup result:', !!direct);
+      if (direct) {
+        console.log('[Snapshot] direct summary present:', !!(direct as any).summary);
+        setStatsData(direct);
+        setError(null);
+        return;
+      }
+
+      // Try to find user object and check alternate IDs
+      const selectedUserObj = users.find(u => u.id === selectedUser || u.fromId === selectedUser);
+      console.log('[Snapshot] selectedUserObj:', selectedUserObj);
+      const candidateIds: string[] = [selectedUser];
+      if (selectedUserObj?.fromId) candidateIds.push(selectedUserObj.fromId);
+      if (selectedUserObj?.id) candidateIds.push(selectedUserObj.id);
+      console.log('[Snapshot] candidateIds:', candidateIds);
+
+      // Dedupe candidates
+      const seen = new Set<string>();
+      const dedupedCandidates = candidateIds.filter(id => {
+        if (!id || seen.has(id)) return false;
+        seen.add(id);
+        return true;
+      });
+
+      const resolved = dedupedCandidates
+        .map(id => staticIndividualStats[id])
+        .find(Boolean);
+
+      if (resolved) {
+        console.log('[Snapshot] resolved summary present:', !!(resolved as any).summary);
+        setStatsData(resolved);
+        setError(null);
       } else {
-        // If data isn't in the snapshot, we can't show it.
-        // You might want to setError("Data not available in snapshot") here.
-        setStatsData(null); 
+        setStatsData(null);
+        setError(`No Individual Stats found for this user. Stats available for ${statsKeys.length} users.`);
       }
       return;
     }
@@ -221,7 +264,7 @@ function App() {
       }
     };
     fetchStats();
-  }, [dbBuffer, dbKey, selectedUser, isSnapshotMode, staticIndividualStats]);
+  }, [dbBuffer, dbKey, selectedUser, isSnapshotMode, staticIndividualStats, users]);
 
   const progressDialog = useMemo(() => (
     <ProgressDialog open={showProgress} progress={progress} message={progressMessage} title="Processing Database" />

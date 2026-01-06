@@ -17,7 +17,6 @@ import {
   DialogTitle, 
   DialogContent, 
   DialogActions, 
-  Box as MuiBox, 
   IconButton, 
   TextField, 
   Select, 
@@ -28,10 +27,9 @@ import {
   Tooltip,
   useTheme,
   useMediaQuery,
-  Menu,
   Divider
 } from '@mui/material';
-import { AnalyticsData, loadDatabase, loadIndividualStats, loadUsers } from '../../utils/database';
+import { AnalyticsData, loadConversationParticipantIds, loadDatabase, loadIndividualStats, loadUsers, User, IndividualStatsData } from '../../utils/database';
 import { createDashboardHtml } from '../../utils/export';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import PersonIcon from '@mui/icons-material/Person';
@@ -72,12 +70,13 @@ const AppLayout: React.FC<AppLayoutProps> = ({
   const location = useLocation();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const isSmUp = useMediaQuery(theme.breakpoints.up('sm'));
   const [welcomeOpen, setWelcomeOpen] = useState(showWelcome);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   
   // Export dialog state
   const [exportOpen, setExportOpen] = useState(false);
-  const [exportSelectedConvos, setExportSelectedConvos] = useState<string[]>([]);
+  const [exportSelectedConvo, setExportSelectedConvo] = useState<string>('');
   const [exportStartDate, setExportStartDate] = useState<string | null>(null);
   const [exportEndDate, setExportEndDate] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
@@ -103,7 +102,6 @@ const AppLayout: React.FC<AppLayoutProps> = ({
   const menuItems = [
     ...(isSnapshotMode ? [] : [{ text: 'Summary', icon: <SummarizeIcon />, path: `${basePath}/summary` }]),
     { text: 'Group Chats', icon: <DashboardIcon />, path: `${basePath}/groupchats` },
-    // Include Individual stats in both modes
     { text: 'Individual Stats', icon: <PersonIcon />, path: `${basePath}/individual` }
   ];
 
@@ -141,27 +139,22 @@ const AppLayout: React.FC<AppLayoutProps> = ({
               '&:hover': { textDecoration: 'none', cursor: 'pointer', opacity: 0.9 }
             }}
           >
-            Signal Snapshot {isSnapshotMode && isMobile ? '' : isSnapshotMode ? '(Units 2025)' : ''}
+            Signal Snapshot {isSnapshotMode && isMobile ? '2025' : isSnapshotMode ? '2025' : ''}
           </Typography>
           <Box sx={{ flexGrow: 1 }} />
-          
-          {isMobile ? (
-            <IconButton color="inherit" onClick={handleWelcomeOpen} aria-label="About Signal Snapshot">
-              <HelpOutlineIcon />
-            </IconButton>
-          ) : (
-            <>
+
+          {!isSnapshotMode && (
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
               <IconButton color="inherit" onClick={handleWelcomeOpen} aria-label="About Signal Snapshot" sx={{ mr: 1 }}>
                 <HelpOutlineIcon />
               </IconButton>
-
-              {dbBuffer && !isSnapshotMode && (
+              {!isMobile && dbBuffer && (
                 <>
                   <Tooltip title={currentDbName}>
-                    <Typography 
-                      variant="body2" 
-                      component="div" 
-                      sx={{ 
+                    <Typography
+                      variant="body2"
+                      component="div"
+                      sx={{
                         color: 'rgba(255, 255, 255, 0.7)',
                         fontFamily: 'monospace',
                         fontSize: '0.8rem',
@@ -169,13 +162,13 @@ const AppLayout: React.FC<AppLayoutProps> = ({
                         whiteSpace: 'nowrap',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
-                        mr: 1
+                        mr: 1,
                       }}
                     >
                       {currentDbName}
                     </Typography>
                   </Tooltip>
-                  
+
                   <input
                     type="file"
                     accept=".db,.sqlite,.sqlite3"
@@ -184,7 +177,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({
                     id="change-db-input"
                     key={currentDbName}
                   />
-                  <Button 
+                  <Button
                     variant="contained"
                     color="primary"
                     onClick={() => document.getElementById('change-db-input')?.click()}
@@ -194,27 +187,20 @@ const AppLayout: React.FC<AppLayoutProps> = ({
                       color: 'primary.main',
                       '&:hover': {
                         backgroundColor: '#f5f5f5',
-                        boxShadow: '0px 2px 4px -1px rgba(0,0,0,0.2), 0px 4px 5px 0px rgba(0,0,0,0.14), 0px 1px 10px 0px rgba(0,0,0,0.12)'
+                        boxShadow:
+                          '0px 2px 4px -1px rgba(0,0,0,0.2), 0px 4px 5px 0px rgba(0,0,0,0.14), 0px 1px 10px 0px rgba(0,0,0,0.12)',
                       },
                       textTransform: 'none',
                       fontWeight: 500,
                       fontSize: { xs: '0.75rem', sm: '0.875rem' },
-                      px: { xs: 1, sm: 2 }
+                      px: { xs: 1, sm: 2 },
                     }}
                   >
-                    Change Data Source
-                  </Button>
-                  <Button
-                    variant="outlined"
-                    color="inherit"
-                    sx={{ ml: 2, borderColor: 'rgba(255,255,255,0.5)', color: 'white', fontSize: { xs: '0.75rem', sm: '0.875rem' }, px: { xs: 1, sm: 2 } }}
-                    onClick={() => setExportOpen(true)}
-                  >
-                    Export
+                    Change Database
                   </Button>
                 </>
               )}
-            </>
+            </Box>
           )}
         </Toolbar>
       </AppBar>
@@ -246,24 +232,14 @@ const AppLayout: React.FC<AppLayoutProps> = ({
               <FormControl fullWidth>
                 <InputLabel id="export-convos-label">Conversation</InputLabel>
                 <Select
-                  multiple
                   labelId="export-convos-label"
-                  value={exportSelectedConvos}
+                  value={exportSelectedConvo}
                   label="Conversation"
-                  onChange={(e) => {
-                    const { target: { value } } = e;
-                    setExportSelectedConvos(
-                      // On autofill we get a stringified value.
-                      typeof value === 'string' ? value.split(',') : value,
-                    );
-                  }}
-                  renderValue={(selected) => {
-                    if (selected.length === 0) {
-                      return <em>All Conversations</em>;
-                    }
-                    return (originalAnalyticsData?.all_conversations || []).filter(c => selected.includes(c.id)).map(c => c.name).join(', ');
-                  }}
+                  onChange={(e) => setExportSelectedConvo(e.target.value)}
                 >
+                  <MenuItem value="">
+                    <em>All Conversations</em>
+                  </MenuItem>
                   {(originalAnalyticsData?.all_conversations || []).map((c: any) => (
                     <MenuItem key={c.id} value={c.id}>
                       <ListItemText primary={c.name} />
@@ -296,9 +272,9 @@ const AppLayout: React.FC<AppLayoutProps> = ({
                 const dateRange: any = {};
                 if (exportStartDate) { const d = new Date(exportStartDate); d.setHours(0,0,0,0); dateRange.startMs = d.getTime(); }
                 if (exportEndDate) { const d = new Date(exportEndDate); d.setHours(23,59,59,999); dateRange.endMs = d.getTime(); }
-                const convFilter = exportSelectedConvos.length > 0 ? exportSelectedConvos : undefined;
                 
-                // 1. Re-query database for the main analytics export
+                const convFilter = exportSelectedConvo ? [exportSelectedConvo] : undefined;
+                
                 const analytics = await loadDatabase(
                     dbBuffer, 
                     undefined, 
@@ -310,53 +286,100 @@ const AppLayout: React.FC<AppLayoutProps> = ({
                     }
                 );
                 
-                if (exportSelectedConvos.length > 0) {
-                    (analytics as any).all_conversations = (analytics as any).all_conversations.filter((c: any) => exportSelectedConvos.includes(c.id));
+                if (exportSelectedConvo) {
+                    analytics.all_conversations = analytics.all_conversations.filter(c => c.id === exportSelectedConvo);
+                    
+                    if (analytics.top_conversations) {
+                        analytics.top_conversations = analytics.top_conversations.filter(c =>
+                            analytics.all_conversations.some(ac => ac.name === c.name)
+                        );
+                    }
+
+                    const totalMembersFiltered = analytics.all_conversations.reduce((sum, c) => sum + (c.memberCount || 0), 0);
+                    const totalMessagesFiltered = Object.values(analytics.message_counts?.by_day || {}).reduce((sum, v) => sum + (v || 0), 0);
+                    const dayCount = Object.keys(analytics.message_counts?.by_day || {}).length;
+                    analytics.kpis = {
+                      ...analytics.kpis,
+                      total_messages: totalMessagesFiltered,
+                      total_conversations: analytics.all_conversations.length,
+                      avg_messages_per_day: dayCount ? Math.round(totalMessagesFiltered / dayCount) : 0,
+                      total_members: totalMembersFiltered,
+                    };
                 }
 
-                // 2. Fetch Users
                 setExportStatus('Loading users...');
                 const allUsers = await loadUsers(dbBuffer, undefined);
 
-                // 3. Export stats for Top 50 Users (Increased from 20)
-                const topUserNames = new Set(analytics.topUsersByMessageCount?.map(u => u.name) || []);
-                // Add top reaction users as well to ensure better coverage
-                const topReactors = new Set(analytics.topUsersByReactionCount?.map(u => u.name) || []);
-                
-                const usersToExport = allUsers
-                    .filter(u => topUserNames.has(u.name) || topReactors.has(u.name))
-                    .slice(0, 50);
+                let usersToExport: User[] = [];
+                if (exportSelectedConvo) {
+                    setExportStatus('Finding conversation participants...');
+                    const participantIds = await loadConversationParticipantIds(
+                      dbBuffer,
+                      undefined,
+                      convFilter,
+                      Object.keys(dateRange).length ? dateRange : undefined,
+                      undefined
+                    );
+
+                    const byAnyId = new Map<string, User>();
+                    allUsers.forEach((u: User) => {
+                      byAnyId.set(u.id, u);
+                      if (u.fromId) byAnyId.set(u.fromId, u);
+                    });
+
+                    const seenIds = new Set<string>();
+                    usersToExport = participantIds
+                      .map((id: string) => byAnyId.get(id) || ({ id, name: id } as User))
+                      .filter((u: User) => {
+                        if (seenIds.has(u.id)) return false;
+                        seenIds.add(u.id);
+                        return true;
+                      })
+                      .sort((a: User, b: User) => a.name.localeCompare(b.name));
+                } else {
+                    const topUserNames = new Set(analytics.topUsersByMessageCount?.map(u => u.name) || []);
+                    const topReactors = new Set(analytics.topUsersByReactionCount?.map(u => u.name) || []);
+                    usersToExport = allUsers
+                        .filter((u: User) => topUserNames.has(u.name) || topReactors.has(u.name))
+                        .slice(0, 50);
+                }
+
+                const individualStatsMap: Record<string, IndividualStatsData> = {};
 
                 if (usersToExport.length > 0) {
                     setExportStatus(`Generating stats for ${usersToExport.length} users...`);
-                    const individualStatsArray = [];
                     
-                    for (let i = 0; i < usersToExport.length; i++) {
+                    for (let i = 0; i <usersToExport.length; i++) {
                         const user = usersToExport[i];
+
                         const progress = 50 + Math.floor((i / usersToExport.length) * 40);
                         setExportProgress(progress);
                         setExportStatus(`Analyzing user: ${user.name}`);
                         
                         try {
-                            const stats = await loadIndividualStats(dbBuffer, undefined, user.id);
-                            individualStatsArray.push({
-                                id: user.id,
-                                name: user.name,
-                                stats: stats
-                            });
+                            const stats = await loadIndividualStats(
+                              dbBuffer,
+                              undefined,
+                              user.id,
+                              undefined,
+                              {
+                                conversationIds: convFilter,
+                                dateRange: Object.keys(dateRange).length ? dateRange : undefined,
+                              }
+                            );
+                            individualStatsMap[user.id] = stats;
                         } catch (e) {
                             console.warn(`Skipping stats for user ${user.name}`, e);
                         }
                     }
-                    
-                    (analytics as any)['individual_stats'] = individualStatsArray;
                 }
 
                 setExportProgress(95);
                 setExportStatus('Creating HTML file...');
 
                 try {
-                  const html = createDashboardHtml(analytics);
+                  const html = createDashboardHtml(analytics, individualStatsMap, usersToExport);
+                  
                   const blob = new Blob([html], { type: 'text/html' });
                   const url = URL.createObjectURL(blob);
                   const a = document.createElement('a');
@@ -537,37 +560,38 @@ const AppLayout: React.FC<AppLayoutProps> = ({
 
         {children || <Outlet />}
         
-        {/* Footer */}
-        <Box 
-          sx={{ 
-            borderTop: 1, 
-            borderColor: 'divider', 
-            backgroundColor: '#f0f4ff', 
-            position: { xs: 'fixed', md: 'fixed' },
-            bottom: 0, 
-            left: { xs: 0, md: drawerWidth }, 
-            right: 0, 
-            minHeight: '44px',
-            zIndex: (theme) => theme.zIndex.drawer - 1, 
-            display: 'flex', 
-            justifyContent: 'center', 
-            alignItems: 'center', 
-            padding: { xs: '8px 4px', md: '12px 0' },
-            flexWrap: 'wrap',
-            gap: { xs: 0.5, md: 2 }
-          }}
-        >
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 0.5, md: 2 }, flexWrap: 'wrap', justifyContent: 'center', fontSize: { xs: '0.75rem', md: '0.875rem' } }}>
-            <a href="https://github.com/ahstewart/signal-snapshot" target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
-              <GitHubIcon fontSize="small" sx={{ mr: 0.5, fontSize: { xs: '0.875rem', md: '1rem' } }} /> 
-              <span style={{ fontSize: 'inherit' }}>GitHub</span>
-            </a>
-            {useMediaQuery(theme.breakpoints.up('sm')) && <span>·</span>}
-            <a href="mailto:hank@signalsnapshot.com" style={{ color: 'inherit', textDecoration: 'none', fontSize: 'inherit' }}>
-              hank@signalsnapshot.com
-            </a>
+        {!isSnapshotMode && (
+          <Box 
+            sx={{ 
+              borderTop: 1, 
+              borderColor: 'divider', 
+              backgroundColor: '#f0f4ff', 
+              position: { xs: 'fixed', md: 'fixed' },
+              bottom: 0, 
+              left: { xs: 0, md: drawerWidth }, 
+              right: 0, 
+              minHeight: '44px',
+              zIndex: (theme) => theme.zIndex.drawer - 1, 
+              display: 'flex', 
+              justifyContent: 'center', 
+              alignItems: 'center', 
+              padding: { xs: '8px 4px', md: '12px 0' },
+              flexWrap: 'wrap',
+              gap: { xs: 0.5, md: 2 }
+            }}
+          >
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 0.5, md: 2 }, flexWrap: 'wrap', justifyContent: 'center', fontSize: { xs: '0.75rem', md: '0.875rem' } }}>
+              <a href="https://github.com/ahstewart/signal-snapshot" target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
+                <GitHubIcon fontSize="small" sx={{ mr: 0.5, fontSize: { xs: '0.875rem', md: '1rem' } }} /> 
+                <span style={{ fontSize: 'inherit' }}>GitHub</span>
+              </a>
+              {isSmUp && <span>·</span>}
+              <a href="mailto:hank@signalsnapshot.com" style={{ color: 'inherit', textDecoration: 'none', fontSize: 'inherit' }}>
+                hank@signalsnapshot.com
+              </a>
+            </Box>
           </Box>
-        </Box>
+        )}
       </Box>
     </Box>
   );

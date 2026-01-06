@@ -97,6 +97,7 @@ export interface EmotionUserData {
     totalReacts: number;
     rate: number;
     score: number;
+    rawRate?: number;
 }
 
 export interface AnalyticsData {
@@ -395,7 +396,7 @@ export async function processDatabase(
             });
         }
 
-        const groupConversationsQuery = `SELECT id, name, type, active_at, json_extract(json, '$.messageCount') as messageCount, CASE WHEN members IS NULL OR members = '' THEN 0 ELSE (LENGTH(members) - LENGTH(REPLACE(members, ' ', ''))) + 1 END as memberCount FROM conversations WHERE type != 'private' ORDER BY messageCount DESC`;
+        const groupConversationsQuery = `SELECT id, name, type, active_at, json_extract(json, '$.messageCount') as messageCount, CASE WHEN members IS NULL OR members = '' THEN 0 ELSE (LENGTH(members) - LENGTH(REPLACE(members, ' ', ''))) + 1 END as memberCount FROM conversations WHERE type != 'private' ${conversationsWhereClause ? conversationsWhereClause.replace('WHERE', 'AND') : ''} ORDER BY messageCount DESC`;
         const groupConversationsResults = execAndLog(groupConversationsQuery);
         let groupConversations: Conversation[] = [];
         if (groupConversationsResults[0]) {
@@ -405,7 +406,7 @@ export async function processDatabase(
                 return { id, name: analytics.userNamesById[id] || name || 'Unknown Conversation', type, active_at, messageCount: messageCount || 0, memberCount: memberCount || 0, avgMessagesPerDay: messageCount && daysActive ? Math.round(messageCount / daysActive) : 0 };
             });
         }
-        const privateConversationsQuery = `SELECT id, name, type, active_at, json_extract(json, '$.messageCount') as messageCount, NULL as memberCount, active_at FROM conversations WHERE type = 'private' AND active_at IS NOT NULL ORDER BY messageCount DESC`;
+        const privateConversationsQuery = `SELECT id, name, type, active_at, json_extract(json, '$.messageCount') as messageCount, NULL as memberCount, active_at FROM conversations WHERE type = 'private' AND active_at IS NOT NULL ${conversationsWhereClause ? conversationsWhereClause.replace('WHERE', 'AND') : ''} ORDER BY messageCount DESC`;
         const privateConversationsResults = execAndLog(privateConversationsQuery);
         let privateConversations: Conversation[] = [];
         if (privateConversationsResults[0]) {
@@ -477,17 +478,40 @@ export async function processDatabase(
 
         if (onProgress) onProgress(80, 'Generating awards...');
         
+        const debugAwards = process.env.REACT_APP_DEBUG_AWARDS === 'true';
+
+        const logAwardQuery = (award: string, sql: string, results: any[]) => {
+            if (!debugAwards) return;
+            const first = results?.[0];
+            const columns = first?.columns;
+            const values = Array.isArray(first?.values) ? first.values : [];
+            log(`[Awards] ${award} query`, {
+                conversationIdsCount: conversationIds?.length ?? 0,
+                dateRange,
+                sql,
+                columns,
+                rowCount: values.length,
+                sampleRows: values.slice(0, 5),
+            });
+        };
+
+        const logAwardParsed = (award: string, parsed: Award | null, raw?: any) => {
+            if (!debugAwards) return;
+            log(`[Awards] ${award} parsed`, { raw, parsed });
+        };
+        
         // Define base where clauses for award queries
-        const msgWhere = buildWhereClause('messages', 'conversationId', 'sourceServiceId IS NOT NULL');
-        const reactWhere = buildWhereClause('reactions', 'conversationId', 'fromId IS NOT NULL');
-        const reactRecvWhere = buildWhereClause('reactions', 'conversationId', 'targetAuthorAci IS NOT NULL');
-        const mentionWhere = buildWhereClause('m', 'conversationId', 'mn.mentionAci IS NOT NULL');
-        const mentionMadeWhere = buildWhereClause('m', 'conversationId', 'm.sourceServiceId IS NOT NULL');
-        const mediaWhere = buildWhereClause('messages', 'conversationId', 'hasAttachments = 1 AND sourceServiceId IS NOT NULL');
+        const msgWhere = buildWhereClause('messages', 'conversationId', ['sourceServiceId IS NOT NULL', messagesDateClause].filter(Boolean).join(' AND '));
+        const reactWhere = buildWhereClause('reactions', 'conversationId', ['fromId IS NOT NULL', reactionsDateClause].filter(Boolean).join(' AND '));
+        const reactRecvWhere = buildWhereClause('reactions', 'conversationId', ['targetAuthorAci IS NOT NULL', reactionsDateClause].filter(Boolean).join(' AND '));
+        
+        const mentionWhere = buildWhereClause('m', 'conversationId', ['mn.mentionAci IS NOT NULL', messagesJoinDateClause].filter(Boolean).join(' AND '));
+        const mentionMadeWhere = buildWhereClause('m', 'conversationId', ['m.sourceServiceId IS NOT NULL', messagesJoinDateClause].filter(Boolean).join(' AND '));
+        const mediaWhere = buildWhereClause('messages', 'conversationId', ['hasAttachments = 1 AND sourceServiceId IS NOT NULL', messagesDateClause].filter(Boolean).join(' AND '));
         
         // --- Custom Where Clauses for Time-Based Awards ---
         // Note: Using Pacific Time (UTC-7) modifier in SQLite
-        const avgLenWhere = buildWhereClause('messages', 'conversationId', "sourceServiceId IS NOT NULL AND body IS NOT NULL");
+        const avgLenWhere = buildWhereClause('messages', 'conversationId', ["sourceServiceId IS NOT NULL AND body IS NOT NULL", messagesDateClause].filter(Boolean).join(' AND '));
         
         const awardQueries = {
             most_messages_sent: `SELECT sourceServiceId, COUNT(*) as count FROM messages ${msgWhere} GROUP BY sourceServiceId ORDER BY count DESC LIMIT 1`,
@@ -522,16 +546,31 @@ export async function processDatabase(
             
             // Hottest Newbie: Joined in 2025 (first message >= Jan 1 2025)
             hottest_newbie: `
-                SELECT sourceServiceId, COUNT(*) / (MIN(sent_at) - 1767254400) as count_since_join
-                FROM messages
-                ${msgWhere ? msgWhere + ' AND ' : 'WHERE '} sourceServiceId IN (
-                    SELECT sourceServiceId
+                WITH per_user AS (
+                    SELECT
+                        sourceServiceId,
+                        COUNT(*) AS msg_count,
+                        MIN(sent_at) AS first_sent_at,
+                        MAX(sent_at) AS last_sent_at
                     FROM messages
+                    ${msgWhere}
                     GROUP BY sourceServiceId
                     HAVING MIN(sent_at) >= 1735689600000
                 )
-                GROUP BY sourceServiceId
-                ORDER BY count_since_join DESC
+                SELECT
+                    sourceServiceId,
+                    ROUND(
+                        CAST(msg_count AS FLOAT) /
+                        (
+                            CASE
+                                WHEN (last_sent_at - first_sent_at) < 86400000 THEN 1.0
+                                ELSE (last_sent_at - first_sent_at) / 86400000.0
+                            END
+                        ),
+                        2
+                    ) AS count
+                FROM per_user
+                ORDER BY count DESC
                 LIMIT 1
             `,
             
@@ -578,6 +617,7 @@ export async function processDatabase(
         const awardResults = await Promise.all<AwardResult>(
             Object.entries(awardQueries).map(async ([award, query]): Promise<AwardResult> => {
                 const results = execAndLog(query);
+                logAwardQuery(award, query, results);
                 return {
                     award,
                     result: results[0]?.values[0] as [string, number] | undefined
@@ -598,6 +638,9 @@ export async function processDatabase(
                 }
                 
                 (analytics.awards as any)[award] = { winner, count };
+                logAwardParsed(award, { winner, count }, result);
+            } else {
+                logAwardParsed(award, null, result);
             }
         });
 
@@ -713,7 +756,59 @@ function calculateEmotionRankings(db: any, userNamesById: Record<string, string>
             };
         }).sort((a: { score: number }, b: { score: number }) => b.score - a.score);
     };
-    
+
+    const getFunnyRanking = (emojis: string[]): EmotionUserData[] => {
+        const emojiList = emojis.map(e => `'${e}'`).join(',');
+        const reactionsWhereClause = buildWhereClause('r', 'conversationId');
+        const messagesWhereClause = buildWhereClause('m', 'conversationId');
+
+        const query = `
+            SELECT
+                r.targetAuthorAci as recipientId,
+                COUNT(r.emoji) as reactionCount,
+                COUNT(DISTINCT r.messageId) as messageCount,
+                COALESCE(msg_counts.totalMessages, 0) as totalMessages
+            FROM reactions r
+            LEFT JOIN (
+                SELECT sourceServiceId, COUNT(*) as totalMessages
+                FROM messages m
+                ${messagesWhereClause}
+                GROUP BY sourceServiceId
+            ) msg_counts ON r.targetAuthorAci = msg_counts.sourceServiceId
+            ${reactionsWhereClause}
+            ${reactionsWhereClause ? 'AND' : 'WHERE'} r.emoji IN (${emojiList})
+            GROUP BY recipientId
+            ORDER BY reactionCount DESC;
+        `;
+
+        const results = db.exec(query);
+        if (!results[0] || !results[0].values) {
+            return [];
+        }
+
+        return results[0].values.map(([recipientId, totalReacts, messageCount, totalMessages]: [string, number, number, number]) => {
+            const denom = messageCount || 1;
+            const rate = totalReacts / denom; // Adjusted rate: laughs per message that got at least 1 laugh
+            const rawRate = totalMessages > 0 ? totalReacts / totalMessages : 0; // Raw rate: laughs per total message
+            
+            // Humor Score: combines raw rate and adjusted rate, with a penalty for low message counts
+            // - Uses weighted geometric mean: adjustedRate is weighted 2x more than rawRate
+            // - Multiplies by log10(totalMessages + 1) to reward users with more messages
+            // - Users with very few messages get significantly lower scores
+            const combinedRate = Math.pow(rawRate, 1/3) * Math.pow(rate, 2/3);
+            const messagePenalty = Math.log10(Math.max(totalMessages, 1) + 1);
+            const score = combinedRate * messagePenalty;
+            
+            return {
+                name: userNamesById[recipientId] || recipientId,
+                totalReacts,
+                rate,
+                score,
+                rawRate
+            };
+        }).sort((a: { score: number }, b: { score: number }) => b.score - a.score);
+    };
+
     // NEW: Ranking based on reaction GIVER
     const getGivingRanking = (emojis: string[]): EmotionUserData[] => {
         const emojiList = emojis.map(e => `'${e}'`).join(',');
@@ -749,7 +844,7 @@ function calculateEmotionRankings(db: any, userNamesById: Record<string, string>
     };
 
     return {
-        funniestUsers: getRanking(laughEmojis),
+        funniestUsers: getFunnyRanking(laughEmojis),
         mostShockingUsers: getRanking(shockEmojis),
         mostLovedUsers: getRanking(loveEmojis),
         mostDislikedUsers: getRanking(dislikeEmojis),
@@ -796,6 +891,7 @@ export async function getUsers(dbBuffer: ArrayBuffer): Promise<User[]> {
         log('Creating database from buffer...');
         const db = await createDatabaseFromBuffer(dbBuffer);
         const nameMap = new Map<string, string>();
+
         // Query to get user name mappings from conversations
         const nameMappingQuery = `
             SELECT id, serviceId, profileFullName, profileName
@@ -864,7 +960,14 @@ export async function getUsers(dbBuffer: ArrayBuffer): Promise<User[]> {
     }
 }
 
-export async function getIndividualStats(dbBuffer: ArrayBuffer, userId: string): Promise<IndividualStatsData> {
+export async function getIndividualStats(
+    dbBuffer: ArrayBuffer,
+    userId: string,
+    options?: {
+        conversationIds?: string[];
+        dateRange?: { startMs?: number; endMs?: number };
+    }
+): Promise<IndividualStatsData> {
     log('getIndividualStats: called with userId', userId);
     if (!userId) {
         log('getIndividualStats: No userId provided');
@@ -894,17 +997,36 @@ export async function getIndividualStats(dbBuffer: ArrayBuffer, userId: string):
         const userServiceId = getIdsResult[0].values[0][1] as string;
         log('getIndividualStats: userUUID', userUUID, 'userServiceId', userServiceId);
 
-        const totalMessagesQuery = `SELECT COUNT(*) FROM messages WHERE sourceServiceId = '${userServiceId}'`;
+        const conversationIds = options?.conversationIds;
+        const dateRange = options?.dateRange;
+
+        const inClause = (ids: string[]) => ids.map(id => `'${id}'`).join(',');
+        const conversationClause = (aliasOrTable = '') => {
+            if (!conversationIds || conversationIds.length === 0) return '';
+            const prefix = aliasOrTable ? `${aliasOrTable}.` : '';
+            return ` AND ${prefix}conversationId IN (${inClause(conversationIds)})`;
+        };
+        const dateClauseFor = (aliasOrTable = '', column: string) => {
+            if (!dateRange || (!dateRange.startMs && !dateRange.endMs)) return '';
+            const prefix = aliasOrTable ? `${aliasOrTable}.` : '';
+            const clauses: string[] = [];
+            if (dateRange.startMs) clauses.push(`${prefix}${column} >= ${dateRange.startMs}`);
+            if (dateRange.endMs) clauses.push(`${prefix}${column} <= ${dateRange.endMs}`);
+            return clauses.length ? ` AND ${clauses.join(' AND ')}` : '';
+        };
+
+        const totalMessagesQuery = `SELECT COUNT(*) FROM messages WHERE sourceServiceId = '${userServiceId}'${conversationClause('messages')}${dateClauseFor('messages', 'sent_at')}`;
         log('getIndividualStats: totalMessagesQuery', totalMessagesQuery);
         const totalMessagesResult = db.exec(totalMessagesQuery);
         log('getIndividualStats: totalMessagesResult', totalMessagesResult);
         const totalMessagesSent = totalMessagesResult[0]?.values[0]?.[0] as number || 0;
 
-        const allTimestampsQuery = `SELECT sent_at FROM messages WHERE sourceServiceId = '${userServiceId}'`;
+        const allTimestampsQuery = `SELECT sent_at FROM messages WHERE sourceServiceId = '${userServiceId}'${conversationClause('messages')}${dateClauseFor('messages', 'sent_at')}`;
         log('getIndividualStats: allTimestampsQuery', allTimestampsQuery);
         const timestampsResult = db.exec(allTimestampsQuery);
         log('getIndividualStats: timestampsResult', timestampsResult);
         let mostPopularDay = 'N/A';
+
         if (timestampsResult[0]?.values.length > 0) {
             const dayCounts = Array(7).fill(0); 
             timestampsResult[0].values.forEach((row: any[]) => {
@@ -919,7 +1041,7 @@ export async function getIndividualStats(dbBuffer: ArrayBuffer, userId: string):
         }
         log('getIndividualStats: mostPopularDay', mostPopularDay);
 
-        const totalReactionsQuery = `SELECT COUNT(*) FROM reactions WHERE fromId = '${userUUID}'`;
+        const totalReactionsQuery = `SELECT COUNT(*) FROM reactions WHERE fromId = '${userUUID}'${conversationClause('reactions')}${dateClauseFor('reactions', 'messageReceivedAt')}`;
         log('getIndividualStats: totalReactionsQuery', totalReactionsQuery);
         const totalReactionsResult = db.exec(totalReactionsQuery);
         log('getIndividualStats: totalReactionsResult', totalReactionsResult);
@@ -930,10 +1052,13 @@ export async function getIndividualStats(dbBuffer: ArrayBuffer, userId: string):
             FROM reactions r
             JOIN conversations c ON r.targetAuthorAci = c.serviceId
             WHERE r.fromId = '${userUUID}'
+            ${conversationIds && conversationIds.length ? `AND r.conversationId IN (${inClause(conversationIds)})` : ''}
+            ${dateRange && (dateRange.startMs || dateRange.endMs) ? `AND ${(dateRange.startMs ? `r.messageReceivedAt >= ${dateRange.startMs}` : '')}${(dateRange.startMs && dateRange.endMs) ? ' AND ' : ''}${(dateRange.endMs ? `r.messageReceivedAt <= ${dateRange.endMs}` : '')}` : ''}
             GROUP BY r.targetAuthorAci, c.profileFullName
             ORDER BY count DESC
             LIMIT 1;
         `;
+
         log('getIndividualStats: reactedToMostQuery', reactedToMostQuery);
         const reactedToMostResult = db.exec(reactedToMostQuery);
         log('getIndividualStats: reactedToMostResult', reactedToMostResult);
@@ -947,10 +1072,12 @@ export async function getIndividualStats(dbBuffer: ArrayBuffer, userId: string):
                 SELECT emoji, COUNT(*) as count
                 FROM reactions
                 WHERE fromId = '${userUUID}' AND targetAuthorAci = '${targetSvcId}'
+                ${conversationClause('reactions')}${dateClauseFor('reactions', 'messageReceivedAt')}
                 GROUP BY emoji
                 ORDER BY count DESC
                 LIMIT 1;
             `;
+
             log('getIndividualStats: topEmojiQuery (reactedToMost)', topEmojiQuery);
             const topEmojiResult = db.exec(topEmojiQuery);
             log('getIndividualStats: topEmojiResult (reactedToMost)', topEmojiResult);
@@ -963,10 +1090,13 @@ export async function getIndividualStats(dbBuffer: ArrayBuffer, userId: string):
             FROM reactions r
             JOIN conversations c ON r.fromId = c.id
             WHERE r.targetAuthorAci = '${userServiceId}'
+            ${conversationIds && conversationIds.length ? `AND r.conversationId IN (${inClause(conversationIds)})` : ''}
+            ${dateRange && (dateRange.startMs || dateRange.endMs) ? `AND ${(dateRange.startMs ? `r.messageReceivedAt >= ${dateRange.startMs}` : '')}${(dateRange.startMs && dateRange.endMs) ? ' AND ' : ''}${(dateRange.endMs ? `r.messageReceivedAt <= ${dateRange.endMs}` : '')}` : ''}
             GROUP BY r.fromId, c.profileFullName
             ORDER BY count DESC
             LIMIT 1;
         `;
+
         log('getIndividualStats: receivedMostQuery', receivedMostQuery);
         const receivedMostResult = db.exec(receivedMostQuery);
         log('getIndividualStats: receivedMostResult', receivedMostResult);
@@ -980,10 +1110,12 @@ export async function getIndividualStats(dbBuffer: ArrayBuffer, userId: string):
                 SELECT emoji, COUNT(*) as count
                 FROM reactions
                 WHERE fromId = '${fromId}' AND targetAuthorAci = '${userServiceId}'
+                ${conversationClause('reactions')}${dateClauseFor('reactions', 'messageReceivedAt')}
                 GROUP BY emoji
                 ORDER BY count DESC
                 LIMIT 1;
             `;
+
             log('getIndividualStats: topEmojiQuery (receivedMost)', topEmojiQuery);
             const topEmojiResult = db.exec(topEmojiQuery);
             log('getIndividualStats: topEmojiResult (receivedMost)', topEmojiResult);
@@ -1008,10 +1140,12 @@ export async function getIndividualStats(dbBuffer: ArrayBuffer, userId: string):
             WHERE nr.rn = 1
                 AND m.sourceServiceId = '${userServiceId}'
                 AND m.body IS NOT NULL AND m.body != ''
+                ${conversationClause('m')}${dateClauseFor('m', 'sent_at')}
             GROUP BY nr.messageId, m.body
             ORDER BY reaction_count DESC
             LIMIT 1;
         `;
+
         log('getIndividualStats: popularMessageQuery', popularMessageQuery);
         const popularMessageResult = db.exec(popularMessageQuery);
         log('getIndividualStats: popularMessageResult', popularMessageResult);
@@ -1047,7 +1181,6 @@ export async function getIndividualStats(dbBuffer: ArrayBuffer, userId: string):
         log('getIndividualStats: returning stats', {
             totalMessagesSent,
             mostPopularDay,
-            totalReactionsSent,
             reactedToMost,
             receivedMostReactionsFrom,
             mostPopularMessage
@@ -1060,7 +1193,7 @@ export async function getIndividualStats(dbBuffer: ArrayBuffer, userId: string):
             receivedMostReactionsFrom,
             mostPopularMessage,
             uniqueReactions: (() => {
-                const uniqueEmojiQuery = `SELECT DISTINCT emoji FROM reactions WHERE fromId = '${userUUID}'`;
+                const uniqueEmojiQuery = `SELECT DISTINCT emoji FROM reactions WHERE fromId = '${userUUID}'${conversationClause('reactions')}${dateClauseFor('reactions', 'messageReceivedAt')}`;
                 const uniqueEmojiResult = db.exec(uniqueEmojiQuery);
                 return uniqueEmojiResult[0]?.values.map((row: any[]) => row[0]) || [];
             })()
@@ -1071,51 +1204,23 @@ export async function getIndividualStats(dbBuffer: ArrayBuffer, userId: string):
     }
 }
 
-export async function loadUsers(
-    dbBuffer: ArrayBuffer,
-    key?: string,
-    onProgress?: ProgressCallback
-): Promise<User[]> {
-    const sqliteHeader = new Uint8Array([
-        0x53, 0x51, 0x4c, 0x69, 0x74, 0x65, 0x20, 0x66, 0x6f, 0x72, 0x6d, 0x61, 0x74,
-        0x20, 0x33, 0x00, // "SQLite format 3\0"
-    ]);
-    const fileHeader = new Uint8Array(dbBuffer.slice(0, 16));
-    const isDecrypted = fileHeader.length === sqliteHeader.length && 
-                       fileHeader.every((byte, i) => byte === sqliteHeader[i]);
-
-    try {
-        let decryptedBuffer = dbBuffer;
-        
-        if (!isDecrypted) {
-            if (!key) {
-                throw new Error('This database is encrypted. Please provide a key.');
-            }
-            if (onProgress) onProgress(0, 'Decrypting user data...');
-            decryptedBuffer = await decryptDatabase(dbBuffer, key, onProgress);
-        }
-        
-        if (onProgress) onProgress(90, 'Loading user data...');
-        return getUsers(decryptedBuffer);
-    } catch (error) {
-        console.error('Error loading users:', error);
-        if (onProgress) onProgress(100, 'Error loading users');
-        throw new Error('Failed to load users. The database might be corrupted or the key is incorrect.');
-    }
-}
-
 export async function loadIndividualStats(
     dbBuffer: ArrayBuffer,
     key: string | undefined,
     userId: string,
-    onProgress?: ProgressCallback
+    onProgress?: ProgressCallback,
+    options?: {
+        conversationIds?: string[];
+        dateRange?: { startMs?: number; endMs?: number };
+    }
 ): Promise<IndividualStatsData> {
+
     const sqliteHeader = new Uint8Array([
         0x53, 0x51, 0x4c, 0x69, 0x74, 0x65, 0x20, 0x66, 0x6f, 0x72, 0x6d, 0x61, 0x74,
-        0x20, 0x33, 0x00, // "SQLite format 3\0"
+        0x20, 0x33, 0x00,
     ]);
     const fileHeader = new Uint8Array(dbBuffer.slice(0, 16));
-    const isDecrypted = fileHeader.length === sqliteHeader.length && 
+    const isDecrypted = fileHeader.length === sqliteHeader.length &&
                        fileHeader.every((byte, i) => byte === sqliteHeader[i]);
 
     try {
@@ -1130,10 +1235,140 @@ export async function loadIndividualStats(
         }
         
         if (onProgress) onProgress(100, 'Loading user stats...');
-        return getIndividualStats(decryptedBuffer, userId);
+        return getIndividualStats(decryptedBuffer, userId, options);
     } catch (error) {
         console.error('Error loading user stats:', error);
         if (onProgress) onProgress(100, 'Error loading user stats');
         throw new Error('Failed to load user stats. The database might be corrupted or the key is incorrect.');
+    }
+}
+
+export async function loadUsers(
+    dbBuffer: ArrayBuffer,
+    key?: string,
+    onProgress?: ProgressCallback
+): Promise<User[]> {
+    const sqliteHeader = new Uint8Array([
+        0x53, 0x51, 0x4c, 0x69, 0x74, 0x65, 0x20, 0x66, 0x6f, 0x72, 0x6d, 0x61, 0x74,
+        0x20, 0x33, 0x00,
+    ]);
+    const fileHeader = new Uint8Array(dbBuffer.slice(0, 16));
+    const isDecrypted = fileHeader.length === sqliteHeader.length &&
+                       fileHeader.every((byte, i) => byte === sqliteHeader[i]);
+
+    try {
+        let decryptedBuffer = dbBuffer;
+
+        if (!isDecrypted) {
+            if (!key) {
+                throw new Error('This database is encrypted. Please provide a key.');
+            }
+            if (onProgress) onProgress(0, 'Decrypting user data...');
+            decryptedBuffer = await decryptDatabase(dbBuffer, key, onProgress);
+        }
+
+        if (onProgress) onProgress(90, 'Loading user data...');
+        return getUsers(decryptedBuffer);
+    } catch (error) {
+        console.error('Error loading users:', error);
+        if (onProgress) onProgress(100, 'Error loading users');
+        throw new Error('Failed to load users. The database might be corrupted or the key is incorrect.');
+    }
+}
+
+async function getConversationParticipantIds(
+    dbBuffer: ArrayBuffer,
+    conversationIds?: string[],
+    dateRange?: { startMs?: number; endMs?: number }
+): Promise<string[]> {
+    const db = await createDatabaseFromBuffer(dbBuffer);
+
+    const inClause = (ids: string[]) => ids.map(id => `'${id}'`).join(',');
+    const conversationClause = (column = 'conversationId') => {
+        if (!conversationIds || conversationIds.length === 0) return '';
+        return ` AND ${column} IN (${inClause(conversationIds)})`;
+    };
+
+    const dateClauseFor = (column: string) => {
+        if (!dateRange || (!dateRange.startMs && !dateRange.endMs)) return '';
+        const clauses: string[] = [];
+        if (dateRange.startMs) clauses.push(`${column} >= ${dateRange.startMs}`);
+        if (dateRange.endMs) clauses.push(`${column} <= ${dateRange.endMs}`);
+        return clauses.length ? ` AND ${clauses.join(' AND ')}` : '';
+    };
+
+    const ids = new Set<string>();
+
+    const messageSql = `
+        SELECT DISTINCT sourceServiceId
+        FROM messages
+        WHERE sourceServiceId IS NOT NULL
+        ${conversationClause('conversationId')}
+        ${dateClauseFor('sent_at')}
+    `;
+    const msgResults = db.exec(messageSql);
+    msgResults?.[0]?.values?.forEach(([id]: any[]) => {
+        if (typeof id === 'string' && id) ids.add(id);
+    });
+
+    const reactFromSql = `
+        SELECT DISTINCT fromId
+        FROM reactions
+        WHERE fromId IS NOT NULL
+        ${conversationClause('conversationId')}
+        ${dateClauseFor('messageReceivedAt')}
+    `;
+    const reactFromResults = db.exec(reactFromSql);
+    reactFromResults?.[0]?.values?.forEach(([id]: any[]) => {
+        if (typeof id === 'string' && id) ids.add(id);
+    });
+
+    const reactToSql = `
+        SELECT DISTINCT targetAuthorAci
+        FROM reactions
+        WHERE targetAuthorAci IS NOT NULL
+        ${conversationClause('conversationId')}
+        ${dateClauseFor('messageReceivedAt')}
+    `;
+    const reactToResults = db.exec(reactToSql);
+    reactToResults?.[0]?.values?.forEach(([id]: any[]) => {
+        if (typeof id === 'string' && id) ids.add(id);
+    });
+
+    return Array.from(ids);
+}
+
+export async function loadConversationParticipantIds(
+    dbBuffer: ArrayBuffer,
+    key: string | undefined,
+    conversationIds?: string[],
+    dateRange?: { startMs?: number; endMs?: number },
+    onProgress?: ProgressCallback
+): Promise<string[]> {
+    const sqliteHeader = new Uint8Array([
+        0x53, 0x51, 0x4c, 0x69, 0x74, 0x65, 0x20, 0x66, 0x6f, 0x72, 0x6d, 0x61, 0x74,
+        0x20, 0x33, 0x00,
+    ]);
+    const fileHeader = new Uint8Array(dbBuffer.slice(0, 16));
+    const isDecrypted = fileHeader.length === sqliteHeader.length &&
+                       fileHeader.every((byte, i) => byte === sqliteHeader[i]);
+
+    try {
+        let decryptedBuffer = dbBuffer;
+
+        if (!isDecrypted) {
+            if (!key) {
+                throw new Error('This database is encrypted. Please provide a key.');
+            }
+            if (onProgress) onProgress(0, 'Decrypting participant data...');
+            decryptedBuffer = await decryptDatabase(dbBuffer, key, onProgress);
+        }
+
+        if (onProgress) onProgress(90, 'Loading conversation participants...');
+        return getConversationParticipantIds(decryptedBuffer, conversationIds, dateRange);
+    } catch (error) {
+        console.error('Error loading participants:', error);
+        if (onProgress) onProgress(100, 'Error loading participants');
+        throw new Error('Failed to load participants. The database might be corrupted or the key is incorrect.');
     }
 }

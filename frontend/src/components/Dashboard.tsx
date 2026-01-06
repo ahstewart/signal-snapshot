@@ -474,12 +474,13 @@ const Dashboard: React.FC<DashboardProps> = ({
     );
   }
 
-  function EmotionRankings({ title, subtitle, data, scoreLabel, totalReactsLabel }: {
+  function EmotionRankings({ title, subtitle, data, scoreLabel, totalReactsLabel, showAdjustedRate }: {
     title: string;
     subtitle?: string;
     data: EmotionUserData[];
     scoreLabel: string;
     totalReactsLabel: string;
+    showAdjustedRate?: boolean;
   }) {
     if (!data || data.length === 0) {
       return null;
@@ -496,7 +497,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                 <TableRow>
                   <TableCell sx={{ fontWeight: 'bold', fontSize: { xs: '0.75rem', md: '0.875rem' }, whiteSpace: 'nowrap' }}>User</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: { xs: '0.75rem', md: '0.875rem' }, whiteSpace: 'nowrap' }}>{totalReactsLabel}</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: { xs: '0.75rem', md: '0.875rem' }, whiteSpace: 'nowrap' }}>Rate</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: { xs: '0.75rem', md: '0.875rem' }, whiteSpace: 'nowrap' }}>Raw Rate</TableCell>
+                  {showAdjustedRate && <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: { xs: '0.75rem', md: '0.875rem' }, whiteSpace: 'nowrap' }}>Adjusted Rate</TableCell>}
                   <TableCell align="right" sx={{ fontWeight: 'bold', fontSize: { xs: '0.75rem', md: '0.875rem' }, whiteSpace: 'nowrap' }}>{scoreLabel}</TableCell>
                 </TableRow>
               </TableHead>
@@ -505,7 +507,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                   <TableRow key={user.name}>
                     <TableCell component="th" scope="row" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>{user.name}</TableCell>
                     <TableCell align="right" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>{user.totalReacts}</TableCell>
-                    <TableCell align="right" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>{user.rate.toFixed(3)}</TableCell>
+                    <TableCell align="right" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>{(showAdjustedRate ? (user.rawRate ?? 0) : user.rate).toFixed(3)}</TableCell>
+                    {showAdjustedRate && <TableCell align="right" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>{user.rate.toFixed(3)}</TableCell>}
                     <TableCell align="right" sx={{ fontSize: { xs: '0.75rem', md: '0.875rem' } }}>{user.score.toFixed(3)}</TableCell>
                   </TableRow>
                 ))}
@@ -578,6 +581,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                     data={analyticsData.funniestUsers}
                     scoreLabel="Humor Score"
                     totalReactsLabel="Total Laugh Reacts"
+                    showAdjustedRate
                 />
                 </Grid>
                 <Grid item xs={12} md={6} lg={4}>
